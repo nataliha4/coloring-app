@@ -37,6 +37,32 @@
             left: 0;
             z-index: 2;
         }
+        #previewCanvas {
+            z-index: 3;
+            pointer-events: none;
+        }
+        #placementHint {
+            display: none;
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            align-items: center;
+            gap: 10px;
+            background: rgba(51, 51, 51, 0.85);
+            color: white;
+            padding: 8px 8px 8px 16px;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        #cancelPlacementBtn {
+            background: #78909C;
+            color: white;
+            padding: 8px 12px;
+        }
         #toolbar {
             background: #ffffff;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
@@ -187,6 +213,13 @@
 
     <div id="canvas-container">
         <canvas id="paintCanvas"></canvas>
+        <canvas id="previewCanvas"></canvas>
+
+        <!-- Shown while Roma is choosing where to put a sketch -->
+        <div id="placementHint">
+            <span>Drag to pick the spot, then let go!</span>
+            <button id="cancelPlacementBtn">Cancel</button>
+        </div>
 
         <!-- Stencil Selection Panel Layout (Visual Mode for Roma) -->
         <div id="stencilPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
@@ -260,6 +293,10 @@
     <script>
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        const placementHint = document.getElementById('placementHint');
+        const cancelPlacementBtn = document.getElementById('cancelPlacementBtn');
         const palette = document.getElementById('palette');
         const paletteContainer = document.getElementById('paletteContainer');
         const paletteToggleBtn = document.getElementById('paletteToggleBtn');
@@ -278,6 +315,9 @@
         const stencilOptions = document.querySelectorAll('.stencil-option');
 
         let isDrawing = false;
+        let pendingShape = null;   // shape waiting to be placed, or null
+        let placePoint = null;     // where the shape would land right now
+        let isPlacing = false;     // finger/mouse is down while placing
         let currentColor = '#FF5A5F';
 
         const colors = [
@@ -329,6 +369,8 @@
 
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
+            previewCanvas.width = canvas.width;
+            previewCanvas.height = canvas.height;
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -340,41 +382,78 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
+        function getPoint(e) {
+            const rect = canvas.getBoundingClientRect();
+            const src = (e.touches && e.touches.length > 0) ? e.touches[0] : e;
+            return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+        }
+
         function startDrawing(e) {
+            if (pendingShape) {
+                isPlacing = true;
+                movePlacement(e);
+                return;
+            }
             isDrawing = true;
             draw(e);
         }
 
         function stopDrawing() {
+            if (pendingShape) {
+                if (isPlacing) finishPlacement();
+                return;
+            }
             isDrawing = false;
             ctx.beginPath();
         }
 
         function draw(e) {
-            if (!isDrawing) return;
-            const rect = canvas.getBoundingClientRect();
-
-            let clientX, clientY;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
+            if (pendingShape) {
+                movePlacement(e);
+                return;
             }
+            if (!isDrawing) return;
+            const { x, y } = getPoint(e);
 
             ctx.lineWidth = brushSlider.value;
             ctx.strokeStyle = currentColor;
-            ctx.lineTo(clientX - rect.left, clientY - rect.top);
+            ctx.lineTo(x, y);
             ctx.stroke();
             ctx.beginPath();
-            ctx.moveTo(clientX - rect.left, clientY - rect.top);
+            ctx.moveTo(x, y);
+        }
+
+        function movePlacement(e) {
+            placePoint = getPoint(e);
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+        }
+
+        function endPlacementMode() {
+            pendingShape = null;
+            placePoint = null;
+            isPlacing = false;
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            placementHint.style.display = 'none';
+        }
+
+        function finishPlacement() {
+            if (placePoint) drawShape(pendingShape, placePoint.x, placePoint.y, ctx);
+            endPlacementMode();
         }
 
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
-        canvas.addEventListener('mouseleave', stopDrawing);
+        canvas.addEventListener('mouseleave', () => {
+            if (pendingShape) {
+                isPlacing = false;
+                placePoint = null;
+                previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            } else {
+                stopDrawing();
+            }
+        });
 
         canvas.addEventListener('touchstart', (e) => { startDrawing(e); }, {passive: false});
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
@@ -415,28 +494,28 @@
             brushSizePanel.style.display = 'none';
         });
 
-        function drawShape(shapeType) {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
+        function drawShape(shapeType, centerX, centerY, c) {
             const size = Math.min(canvas.width, canvas.height) * 0.3;
 
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#aaaaaa';
+            c.lineWidth = 3;
+            c.strokeStyle = '#aaaaaa';
+            c.lineCap = 'round';
+            c.lineJoin = 'round';
 
             if (shapeType === 'diamond') {
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY - size);
-                ctx.lineTo(centerX + size, centerY);
-                ctx.lineTo(centerX, centerY + size);
-                ctx.lineTo(centerX - size, centerY);
-                ctx.closePath();
-                ctx.stroke();
+                c.beginPath();
+                c.moveTo(centerX, centerY - size);
+                c.lineTo(centerX + size, centerY);
+                c.lineTo(centerX, centerY + size);
+                c.lineTo(centerX - size, centerY);
+                c.closePath();
+                c.stroke();
             } else if (shapeType === 'circle') {
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, size, 0, Math.PI * 2);
-                ctx.stroke();
+                c.beginPath();
+                c.arc(centerX, centerY, size, 0, Math.PI * 2);
+                c.stroke();
             } else if (shapeType === 'star') {
-                ctx.beginPath();
+                c.beginPath();
                 const points = 5;
                 const inset = 0.5;
                 for (let i = 0; i < points * 2; i++) {
@@ -445,22 +524,25 @@
                     const x = centerX + r * Math.cos(angle);
                     const y = centerY + r * Math.sin(angle);
                     if (i === 0) {
-                        ctx.moveTo(x, y);
+                        c.moveTo(x, y);
                     } else {
-                        ctx.lineTo(x, y);
+                        c.lineTo(x, y);
                     }
                 }
-                ctx.closePath();
-                ctx.stroke();
+                c.closePath();
+                c.stroke();
             }
-            ctx.beginPath();
+            c.beginPath();
         }
+
+        cancelPlacementBtn.addEventListener('click', endPlacementMode);
 
         stencilOptions.forEach(option => {
             option.addEventListener('click', (e) => {
                 const button = e.target.closest('.stencil-option');
                 const selectedShape = button.getAttribute('data-shape');
-                drawShape(selectedShape);
+                pendingShape = selectedShape;
+                placementHint.style.display = 'flex';
                 stencilPanel.style.display = 'none';
             });
         });

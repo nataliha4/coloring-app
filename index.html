@@ -41,29 +41,28 @@
             z-index: 3;
             pointer-events: none;
         }
-        #placementHint {
+        /* Big picture-only buttons shown while a sketch is waiting to be placed */
+        #placementControls {
             display: none;
             position: absolute;
-            top: 12px;
+            bottom: 16px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 5;
+            gap: 28px;
+        }
+        .place-btn {
+            width: 68px;
+            height: 68px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
-            gap: 10px;
-            background: rgba(51, 51, 51, 0.85);
-            color: white;
-            padding: 8px 8px 8px 16px;
-            border-radius: 24px;
-            font-size: 15px;
-            font-weight: bold;
-            white-space: nowrap;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
         }
-        #cancelPlacementBtn, #donePlacementBtn {
-            color: white;
-            padding: 8px 12px;
-        }
-        #cancelPlacementBtn { background: #78909C; }
         #donePlacementBtn { background: #24C655; }
+        #cancelPlacementBtn { background: #78909C; }
         .stencil-tab {
             font-size: 26px;
             width: 58px;
@@ -229,11 +228,14 @@
         <canvas id="paintCanvas"></canvas>
         <canvas id="previewCanvas"></canvas>
 
-        <!-- Shown while Roma is choosing where to put a sketch -->
-        <div id="placementHint">
-            <span>Drag to pick the spot, then let go!</span>
-            <button id="donePlacementBtn">Done</button>
-            <button id="cancelPlacementBtn">Cancel</button>
+        <!-- Shown while a sketch is waiting to be placed: a big green check and a gray X, no words -->
+        <div id="placementControls">
+            <button id="cancelPlacementBtn" class="place-btn" aria-label="Cancel">
+                <svg viewBox="0 0 24 24" width="34" height="34"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
+            </button>
+            <button id="donePlacementBtn" class="place-btn" aria-label="Done">
+                <svg viewBox="0 0 24 24" width="38" height="38"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
         </div>
 
         <!-- Stencil Selection Panel Layout (Visual Mode for Roma) -->
@@ -288,7 +290,7 @@
         const ctx = canvas.getContext('2d');
         const previewCanvas = document.getElementById('previewCanvas');
         const previewCtx = previewCanvas.getContext('2d');
-        const placementHint = document.getElementById('placementHint');
+        const placementControls = document.getElementById('placementControls');
         const cancelPlacementBtn = document.getElementById('cancelPlacementBtn');
         const donePlacementBtn = document.getElementById('donePlacementBtn');
         const stencilGrid = document.getElementById('stencilGrid');
@@ -408,7 +410,7 @@
 
         function stopDrawing() {
             if (pendingShape) {
-                if (isPlacing) finishPlacement();
+                isPlacing = false;   // the shape stays put until the green check is pressed
                 return;
             }
             isDrawing = false;
@@ -417,7 +419,7 @@
 
         function draw(e) {
             if (pendingShape) {
-                movePlacement(e);
+                if (isPlacing) movePlacement(e);
                 return;
             }
             if (!isDrawing) return;
@@ -431,11 +433,33 @@
             ctx.moveTo(x, y);
         }
 
+        // Dashed orange "marching ants" box that shows the shape is not stuck down yet.
+        function drawSelectionBox(box) {
+            if (!box) return;
+            const pad = 12;
+            previewCtx.save();
+            previewCtx.setLineDash([10, 8]);
+            previewCtx.lineDashOffset = -((performance.now() / 30) % 18);
+            previewCtx.strokeStyle = '#FF9F43';
+            previewCtx.lineWidth = 4;
+            previewCtx.lineJoin = 'round';
+            previewCtx.strokeRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2);
+            previewCtx.restore();
+        }
+
         function renderPreview() {
             previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             if (pendingShape && placePoint) {
-                drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+                const box = drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+                drawSelectionBox(box);
             }
+        }
+
+        let marchFrame = null;
+        function marchTick() {
+            if (!pendingShape) { marchFrame = null; return; }
+            renderPreview();
+            marchFrame = requestAnimationFrame(marchTick);
         }
 
         function movePlacement(e) {
@@ -448,16 +472,18 @@
             pendingShape = shapeType;
             placePoint = { x: canvas.width / 2, y: canvas.height / 2 };
             renderPreview();
-            placementHint.style.display = 'flex';
+            placementControls.style.display = 'flex';
             stencilPanel.style.display = 'none';
+            if (!marchFrame) marchFrame = requestAnimationFrame(marchTick);
         }
 
         function endPlacementMode() {
             pendingShape = null;
             placePoint = null;
             isPlacing = false;
+            if (marchFrame) { cancelAnimationFrame(marchFrame); marchFrame = null; }
             renderPreview();
-            placementHint.style.display = 'none';
+            placementControls.style.display = 'none';
         }
 
         function finishPlacement() {
@@ -644,8 +670,7 @@
             const shape = SHAPES[shapeType];
             if (!shape) return;
             if (shape.word) {
-                drawWord(shape.word, centerX, centerY, c);
-                return;
+                return drawWord(shape.word, centerX, centerY, c);
             }
             const size = Math.min(canvas.width, canvas.height) * 0.3;
             const scale = size / 40;   // shapes reach 40 units from their center
@@ -660,6 +685,29 @@
             c.lineJoin = 'round';
             c.stroke(new Path2D(shape.d));
             c.restore();
+
+            const b = shapeBounds(shapeType);
+            return { x: centerX + (b.x - 50) * scale, y: centerY + (b.y - 50) * scale, w: b.width * scale, h: b.height * scale };
+        }
+
+        // Tight box around a sketch's path, in grid units (measured once per shape).
+        const boundsCache = {};
+        function shapeBounds(name) {
+            if (!boundsCache[name]) {
+                const svgNS = 'http://www.w3.org/2000/svg';
+                const svg = document.createElementNS(svgNS, 'svg');
+                svg.setAttribute('width', '1');
+                svg.setAttribute('height', '1');
+                svg.style.cssText = 'position: absolute; visibility: hidden;';
+                const path = document.createElementNS(svgNS, 'path');
+                path.setAttribute('d', SHAPES[name].d);
+                svg.appendChild(path);
+                document.body.appendChild(svg);
+                const b = path.getBBox();
+                document.body.removeChild(svg);
+                boundsCache[name] = { x: b.x, y: b.y, width: b.width, height: b.height };
+            }
+            return boundsCache[name];
         }
 
         // Hollow outline letters, sized to about 75% of the page width (never taller than half the page).
@@ -679,7 +727,14 @@
             c.strokeStyle = '#aaaaaa';
             c.lineJoin = 'round';
             c.strokeText(word, centerX, centerY);
+            const m = c.measureText(word);
             c.restore();
+            return {
+                x: centerX - m.actualBoundingBoxLeft,
+                y: centerY - m.actualBoundingBoxAscent,
+                w: m.actualBoundingBoxLeft + m.actualBoundingBoxRight,
+                h: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent
+            };
         }
 
         function renderStencilPicker() {

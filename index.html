@@ -70,10 +70,13 @@
             width: 42px;
             height: 42px;
             border-radius: 50%;
-            border: 3px solid transparent;
+            border: 3px solid #ddd;
             cursor: pointer;
             flex-shrink: 0;
             transition: transform 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .color-swatch.active {
             border-color: #333;
@@ -288,6 +291,9 @@
             const swatch = document.createElement('div');
             swatch.className = `color-swatch ${idx === 0 ? 'active' : ''}`;
             swatch.style.backgroundColor = color;
+            if (color === '#FFFFFF') {
+                swatch.innerHTML = '<svg viewBox="0 0 24 24" style="width: 60%; height: 60%; pointer-events: none;"><path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0M4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53l-4.95-4.95l-4.95 4.95z" fill="#999"/></svg>';
+            }
             swatch.addEventListener('click', () => {
                 const activeSwatch = document.querySelector('.color-swatch.active');
                 if (activeSwatch) activeSwatch.classList.remove('active');

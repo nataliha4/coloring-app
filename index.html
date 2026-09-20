@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Grandson's Sketchpad</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background: #ffffff;
+            width: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+        }
+        #toolbar {
+            background: #ffffff;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            z-index: 10;
+            gap: 10px;
+        }
+        .palette-container {
+            width: 100%;
+            display: none;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .palette {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 5px 0;
+            width: 100%;
+            justify-content: flex-start;
+            scrollbar-width: none;
+        }
+        .palette::-webkit-scrollbar {
+            display: none;
+        }
+        .color-swatch {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: transform 0.1s ease;
+        }
+        .color-swatch.active {
+            border-color: #333;
+            transform: scale(1.15);
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+            justify-content: flex-end;
+        }
+        button {
+            padding: 10px 14px;
+            border: none;
+            font-weight: bold;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        #paletteToggleBtn {
+            background: #FF9F43;
+            color: white;
+            flex: 1;
+        }
+        #paletteToggleBtn:active {
+            background: #EE5A24;
+        }
+        #loadBtn {
+            background: #24C655;
+            color: white;
+        }
+        #loadBtn:active {
+            background: #0E6B2A;
+        }
+        #clearBtn {
+            background: #78909C;
+            color: white;
+        }
+        #clearBtn:active {
+            background: #546E7A;
+        }
+        input[type="range"] {
+            width: 70px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="paintCanvas"></canvas>
+
+        <!-- Stencil Selection Panel Layout (Visual Mode for Roma) -->
+        <div id="stencilPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
+            <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
+                <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Pick a Sketch!</h3>
+
+                <!-- Large icon buttons that don't require reading -->
+                <div style="display: flex; justify-content: space-around; gap: 10px; margin-bottom: 20px;">
+
+                    <!-- Diamond Option -->
+                    <button class="stencil-option" data-shape="diamond" style="background: #e1f5fe; border: 3px solid #00A6FF; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
+                            <polygon points="20,4 36,20 20,36 4,20" fill="none" stroke="#00A6FF" stroke-width="4" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <!-- Circle Option -->
+                    <button class="stencil-option" data-shape="circle" style="background: #e8f5e9; border: 3px solid #24C655; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
+                            <circle cx="20" cy="20" r="15" fill="none" stroke="#24C655" stroke-width="4"/>
+                        </svg>
+                    </button>
+
+                    <!-- Star Option -->
+                    <button class="stencil-option" data-shape="star" style="background: #f3e5f5; border: 3px solid #9C27B0; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
+                            <polygon points="20,2 25,14 38,14 28,23 32,36 20,28 8,36 12,23 2,14 15,14" fill="none" stroke="#9C27B0" stroke-width="4" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                <button id="closePanelBtn" style="background: #78909C; color: white; width: 100%; padding: 10px; border-radius: 20px; font-weight: bold; border: none; font-size: 14px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toolbar">
+        <div class="palette-container" id="paletteContainer">
+            <div class="palette" id="palette"></div>
+        </div>
+        <div class="controls">
+            <input type="range" id="brushSize" min="2" max="30" value="8">
+            <div class="btn-group">
+                <button id="paletteToggleBtn">Open Palette</button>
+                <button id="loadBtn">Open Sketch</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('paintCanvas');
+        const ctx = canvas.getContext('2d');
+        const palette = document.getElementById('palette');
+        const paletteContainer = document.getElementById('paletteContainer');
+        const paletteToggleBtn = document.getElementById('paletteToggleBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const brushSlider = document.getElementById('brushSize');
+
+        // Panel Elements
+        const stencilPanel = document.getElementById('stencilPanel');
+        const closePanelBtn = document.getElementById('closePanelBtn');
+        const stencilOptions = document.querySelectorAll('.stencil-option');
+
+        let isDrawing = false;
+        let currentColor = '#FF5A5F';
+
+        const colors = [
+            '#FF5A5F', '#FF7A00', '#FFB400', '#FFE600',
+            '#8CE071', '#24C655', '#0E6B2A', '#007A87',
+            '#00A6FF', '#1D3557', '#9C27B0', '#E91E63',
+            '#8B5A2B', '#111111', '#B0B0B0', '#FFFFFF'
+        ];
+
+        colors.forEach((color, idx) => {
+            const swatch = document.createElement('div');
+            swatch.className = `color-swatch ${idx === 0 ? 'active' : ''}`;
+            swatch.style.backgroundColor = color;
+            swatch.addEventListener('click', () => {
+                const activeSwatch = document.querySelector('.color-swatch.active');
+                if (activeSwatch) activeSwatch.classList.remove('active');
+                swatch.classList.add('active');
+                currentColor = color;
+            });
+            palette.appendChild(swatch);
+        });
+
+        function resizeCanvas() {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            if (canvas.width > 0 && canvas.height > 0) {
+                tempCtx.drawImage(canvas, 0, 0);
+            }
+
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+                ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function startDrawing(e) {
+            isDrawing = true;
+            draw(e);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            ctx.lineWidth = brushSlider.value;
+            ctx.strokeStyle = currentColor;
+            ctx.lineTo(clientX - rect.left, clientY - rect.top);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(clientX - rect.left, clientY - rect.top);
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        canvas.addEventListener('touchstart', (e) => { startDrawing(e); }, {passive: false});
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
+        canvas.addEventListener('touchend', stopDrawing);
+
+        paletteToggleBtn.addEventListener('click', () => {
+            if (paletteContainer.style.display === 'block') {
+                paletteContainer.style.display = 'none';
+                paletteToggleBtn.textContent = 'Open Palette';
+            } else {
+                gradient = 'block';
+                paletteContainer.style.display = 'block';
+                paletteToggleBtn.textContent = 'Close Palette';
+            }
+            requestAnimationFrame(() => {
+                resizeCanvas();
+            });
+        });
+
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        loadBtn.addEventListener('click', () => {
+            stencilPanel.style.display = 'flex';
+        });
+
+        closePanelBtn.addEventListener('click', () => {
+            stencilPanel.style.display = 'none';
+        });
+
+        function drawShape(shapeType) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const size = Math.min(canvas.width, canvas.height) * 0.3;
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#aaaaaa';
+
+            if (shapeType === 'diamond') {
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY - size);
+                ctx.lineTo(centerX + size, centerY);
+                ctx.lineTo(centerX, centerY + size);
+                ctx.lineTo(centerX - size, centerY);
+                ctx.closePath();
+                ctx.stroke();
+            } else if (shapeType === 'circle') {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, size, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (shapeType === 'star') {
+                ctx.beginPath();
+                const points = 5;
+                const inset = 0.5;
+                for (let i = 0; i < points * 2; i++) {
+                    const r = (i % 2 === 0) ? size : size * inset;
+                    const angle = (Math.PI * i) / points - Math.PI / 2;
+                    const x = centerX + r * Math.cos(angle);
+                    const y = centerY + r * Math.sin(angle);
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+            ctx.beginPath();
+        }
+
+        stencilOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                const button = e.target.closest('.stencil-option');
+                const selectedShape = button.getAttribute('data-shape');
+                drawShape(selectedShape);
+                stencilPanel.style.display = 'none';
+            });
+        });
+    </script>
+</body>

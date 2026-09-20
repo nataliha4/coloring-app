@@ -37,8 +37,13 @@
             left: 0;
             z-index: 2;
         }
-        #previewCanvas {
+        /* Layers, bottom to top: paint (colors), lines (sketch outlines), preview (sketch being placed) */
+        #lineCanvas {
             z-index: 3;
+            pointer-events: none;
+        }
+        #previewCanvas {
+            z-index: 4;
             pointer-events: none;
         }
         /* Big picture-only buttons shown while a sketch is waiting to be placed */
@@ -49,13 +54,26 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 5;
-            gap: 28px;
+            gap: 16px;
+            align-items: center;
         }
+        body.palette-open #placementControls { bottom: 96px; }
         .place-btn {
             width: 68px;
             height: 68px;
             padding: 0;
             border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+        }
+        .size-btn {
+            width: 52px;
+            height: 52px;
+            padding: 0;
+            border-radius: 50%;
+            background: #FF9F43;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -86,12 +104,17 @@
             padding: 10px;
             z-index: 10;
             gap: 10px;
+            position: relative;
         }
         .palette-container {
-            width: 100%;
             display: none;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            padding: 8px 10px;
+            background: #ffffff;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.08);
         }
         .palette {
             display: flex;
@@ -126,13 +149,16 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            gap: 8px;
+            gap: 6px;
         }
         .btn-group {
             display: flex;
             gap: 6px;
             flex: 1;
             justify-content: flex-end;
+        }
+        .btn-group button {
+            padding: 10px 12px;
         }
         button {
             padding: 10px 14px;
@@ -165,7 +191,7 @@
         #clearBtn:active {
             background: #546E7A;
         }
-        #brushSizeBtn {
+        #brushSizeBtn, #fillBtn {
             background: #f0f2f5;
             border: 2px solid #ddd;
             width: 44px;
@@ -176,6 +202,10 @@
             justify-content: center;
             padding: 0;
             flex-shrink: 0;
+        }
+        #brushSizeBtn.active, #fillBtn.active {
+            border-color: #FF9F43;
+            background: #fff3e0;
         }
         .brush-preview-small {
             border-radius: 50%;
@@ -226,12 +256,19 @@
 
     <div id="canvas-container">
         <canvas id="paintCanvas"></canvas>
+        <canvas id="lineCanvas"></canvas>
         <canvas id="previewCanvas"></canvas>
 
         <!-- Shown while a sketch is waiting to be placed: a big green check and a gray X, no words -->
         <div id="placementControls">
             <button id="cancelPlacementBtn" class="place-btn" aria-label="Cancel">
                 <svg viewBox="0 0 24 24" width="34" height="34"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
+            </button>
+            <button id="smallerBtn" class="size-btn" aria-label="Smaller">
+                <svg viewBox="0 0 24 24" width="28" height="28"><path d="M5 12h14" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
+            </button>
+            <button id="biggerBtn" class="size-btn" aria-label="Bigger">
+                <svg viewBox="0 0 24 24" width="28" height="28"><path d="M5 12h14M12 5v14" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
             </button>
             <button id="donePlacementBtn" class="place-btn" aria-label="Done">
                 <svg viewBox="0 0 24 24" width="38" height="38"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -274,12 +311,18 @@
             <div class="palette" id="palette"></div>
         </div>
         <div class="controls">
-            <button id="brushSizeBtn" aria-label="Brush size">
+            <button id="brushSizeBtn" class="active" aria-label="Brush">
                 <span id="brushPreviewSmall" class="brush-preview-small"></span>
             </button>
+            <button id="fillBtn" aria-label="Fill with color">
+                <svg viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5c0 1.1.9 2 2 2s2-.9 2-2c0-1.33-2-3.5-2-3.5z" fill="#546E7A"/>
+                    <rect id="fillBarColor" x="1" y="19.5" width="22" height="4" rx="1.5" fill="#FF5A5F"/>
+                </svg>
+            </button>
             <div class="btn-group">
-                <button id="paletteToggleBtn">Open Palette</button>
-                <button id="loadBtn">Open Sketch</button>
+                <button id="paletteToggleBtn">Colors</button>
+                <button id="loadBtn">Sketch</button>
                 <button id="clearBtn">Clear</button>
             </div>
         </div>
@@ -288,11 +331,17 @@
     <script>
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d');
+        const lineCanvas = document.getElementById('lineCanvas');
+        const lineCtx = lineCanvas.getContext('2d');
         const previewCanvas = document.getElementById('previewCanvas');
         const previewCtx = previewCanvas.getContext('2d');
         const placementControls = document.getElementById('placementControls');
         const cancelPlacementBtn = document.getElementById('cancelPlacementBtn');
         const donePlacementBtn = document.getElementById('donePlacementBtn');
+        const smallerBtn = document.getElementById('smallerBtn');
+        const biggerBtn = document.getElementById('biggerBtn');
+        const fillBtn = document.getElementById('fillBtn');
+        const fillBarColor = document.getElementById('fillBarColor');
         const stencilGrid = document.getElementById('stencilGrid');
         const stencilTabs = document.getElementById('stencilTabs');
         const palette = document.getElementById('palette');
@@ -315,6 +364,9 @@
         let pendingShape = null;   // shape waiting to be placed, or null
         let placePoint = null;     // where the shape would land right now
         let isPlacing = false;     // finger/mouse is down while placing
+        let placeScale = 1;        // how much bigger/smaller than normal the waiting shape is
+        let pinch = null;          // {startDist, startScale} while two fingers are down
+        let currentTool = 'brush'; // 'brush' or 'fill'
         let currentColor = '#FF5A5F';
 
         const colors = [
@@ -352,29 +404,37 @@
             brushPreviewDot.style.width = `${bigSize}px`;
             brushPreviewDot.style.height = `${bigSize}px`;
             brushPreviewDot.style.backgroundColor = currentColor;
+            fillBarColor.setAttribute('fill', currentColor);
         }
         updateBrushPreview();
 
-        function resizeCanvas() {
+        // Resize one layer to w x h, keeping what was drawn on it.
+        function resizeLayer(layer, w, h) {
+            if (layer.width === w && layer.height === h) return;
             const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            if (canvas.width > 0 && canvas.height > 0) {
-                tempCtx.drawImage(canvas, 0, 0);
+            tempCanvas.width = layer.width;
+            tempCanvas.height = layer.height;
+            if (layer.width > 0 && layer.height > 0) {
+                tempCanvas.getContext('2d').drawImage(layer, 0, 0);
             }
 
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
-            previewCanvas.width = canvas.width;
-            previewCanvas.height = canvas.height;
-
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            layer.width = w;
+            layer.height = h;
+            const c = layer.getContext('2d');
+            c.lineCap = 'round';
+            c.lineJoin = 'round';
 
             if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-                ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+                c.drawImage(tempCanvas, 0, 0, w, h);
             }
+        }
+
+        function resizeCanvas() {
+            const w = canvas.parentElement.clientWidth;
+            const h = canvas.parentElement.clientHeight;
+            resizeLayer(canvas, w, h);
+            resizeLayer(lineCanvas, w, h);
+            resizeLayer(previewCanvas, w, h);
 
             // Resizing blanks the preview canvas, so redraw a shape that is being placed.
             if (pendingShape) {
@@ -397,6 +457,11 @@
                 movePlacement(e);
                 return;
             }
+            if (currentTool === 'fill') {
+                const point = getPoint(e);
+                floodFill(point.x, point.y);
+                return;
+            }
             isDrawing = true;
             // Leave a dot right away, so a single tap makes a mark.
             const { x, y } = getPoint(e);
@@ -411,6 +476,7 @@
         function stopDrawing() {
             if (pendingShape) {
                 isPlacing = false;   // the shape stays put until the green check is pressed
+                pinch = null;
                 return;
             }
             isDrawing = false;
@@ -450,7 +516,7 @@
         function renderPreview() {
             previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             if (pendingShape && placePoint) {
-                const box = drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+                const box = drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx, placeScale);
                 drawSelectionBox(box);
             }
         }
@@ -462,14 +528,46 @@
             marchFrame = requestAnimationFrame(marchTick);
         }
 
+        const MIN_SCALE = 0.25;
+        const MAX_SCALE = 2.5;
+        const clampScale = (v) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, v));
+
+        function scaleBy(factor) {
+            placeScale = clampScale(placeScale * factor);
+            renderPreview();
+        }
+
+        // Two fingers: the middle point moves the shape, spreading or squeezing resizes it.
+        function twoFingers(e) {
+            if (!e.touches || e.touches.length < 2) return null;
+            const rect = canvas.getBoundingClientRect();
+            const a = e.touches[0];
+            const b = e.touches[1];
+            return {
+                dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+                x: (a.clientX + b.clientX) / 2 - rect.left,
+                y: (a.clientY + b.clientY) / 2 - rect.top
+            };
+        }
+
         function movePlacement(e) {
-            placePoint = getPoint(e);
+            const two = twoFingers(e);
+            if (two) {
+                if (!pinch) pinch = { startDist: Math.max(two.dist, 1), startScale: placeScale };
+                placePoint = { x: two.x, y: two.y };
+                placeScale = clampScale(pinch.startScale * two.dist / pinch.startDist);
+            } else {
+                pinch = null;
+                placePoint = getPoint(e);
+            }
             renderPreview();
         }
 
         // Show the shape in the middle right away; dragging moves it from there.
         function startPlacement(shapeType) {
             pendingShape = shapeType;
+            placeScale = 1;
+            pinch = null;
             placePoint = { x: canvas.width / 2, y: canvas.height / 2 };
             renderPreview();
             placementControls.style.display = 'flex';
@@ -481,13 +579,15 @@
             pendingShape = null;
             placePoint = null;
             isPlacing = false;
+            pinch = null;
             if (marchFrame) { cancelAnimationFrame(marchFrame); marchFrame = null; }
             renderPreview();
             placementControls.style.display = 'none';
         }
 
         function finishPlacement() {
-            if (placePoint) drawShape(pendingShape, placePoint.x, placePoint.y, ctx);
+            // Sketch lines go on their own layer above the colors, so coloring never covers them.
+            if (placePoint) drawShape(pendingShape, placePoint.x, placePoint.y, lineCtx, placeScale);
             endPlacementMode();
         }
 
@@ -506,21 +606,26 @@
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
         canvas.addEventListener('touchend', stopDrawing);
 
+        // Mouse wheel (or trackpad pinch) resizes a waiting shape.
+        canvas.addEventListener('wheel', (e) => {
+            if (!pendingShape) return;
+            e.preventDefault();
+            scaleBy(Math.exp(-e.deltaY * (e.ctrlKey ? 0.02 : 0.005)));
+        }, {passive: false});
+
         paletteToggleBtn.addEventListener('click', () => {
             if (paletteContainer.style.display === 'block') {
                 paletteContainer.style.display = 'none';
-                paletteToggleBtn.textContent = 'Open Palette';
+                document.body.classList.remove('palette-open');
             } else {
                 paletteContainer.style.display = 'block';
-                paletteToggleBtn.textContent = 'Close Palette';
+                document.body.classList.add('palette-open');
             }
-            requestAnimationFrame(() => {
-                resizeCanvas();
-            });
         });
 
         clearBtn.addEventListener('click', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
         });
 
         loadBtn.addEventListener('click', () => {
@@ -533,9 +638,25 @@
 
         brushSlider.addEventListener('input', updateBrushPreview);
 
+        function setTool(tool) {
+            currentTool = tool;
+            brushSizeBtn.classList.toggle('active', tool === 'brush');
+            fillBtn.classList.toggle('active', tool === 'fill');
+        }
+
+        // Tapping the brush picks it; tapping it again opens the size panel.
         brushSizeBtn.addEventListener('click', () => {
-            brushSizePanel.style.display = 'flex';
+            if (currentTool !== 'brush') {
+                setTool('brush');
+            } else {
+                brushSizePanel.style.display = 'flex';
+            }
         });
+
+        fillBtn.addEventListener('click', () => setTool('fill'));
+
+        smallerBtn.addEventListener('click', () => scaleBy(1 / 1.2));
+        biggerBtn.addEventListener('click', () => scaleBy(1.2));
 
         closeBrushPanelBtn.addEventListener('click', () => {
             brushSizePanel.style.display = 'none';
@@ -666,13 +787,13 @@
         ];
         let activeCategory = 'shapes';
 
-        function drawShape(shapeType, centerX, centerY, c) {
+        function drawShape(shapeType, centerX, centerY, c, sizeMultiplier = 1) {
             const shape = SHAPES[shapeType];
             if (!shape) return;
             if (shape.word) {
-                return drawWord(shape.word, centerX, centerY, c);
+                return drawWord(shape.word, centerX, centerY, c, sizeMultiplier);
             }
-            const size = Math.min(canvas.width, canvas.height) * 0.3;
+            const size = Math.min(canvas.width, canvas.height) * 0.3 * sizeMultiplier;
             const scale = size / 40;   // shapes reach 40 units from their center
 
             c.save();
@@ -711,12 +832,12 @@
         }
 
         // Hollow outline letters, sized to about 75% of the page width (never taller than half the page).
-        function drawWord(word, centerX, centerY, c) {
+        function drawWord(word, centerX, centerY, c, sizeMultiplier = 1) {
             const probe = 100;
             c.save();
             c.font = `bold ${probe}px ${WORD_FONT}`;
             const widthAtProbe = c.measureText(word).width;
-            const fontSize = Math.min(
+            const fontSize = sizeMultiplier * Math.min(
                 probe * (canvas.width * 0.75) / widthAtProbe,
                 canvas.height * 0.5
             );
@@ -772,6 +893,118 @@
                 });
         }
         renderStencilPicker();
+
+        // ---- Fill tool (paint bucket) ----
+        // Colors the whole closed area you tap. Sketch outlines (lineCanvas) always stop the fill;
+        // hand-drawn strokes stop it too, because they differ in color from the area being filled.
+        function hexToRgb(hex) {
+            const n = parseInt(hex.slice(1), 16);
+            return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+        }
+
+        function floodFill(startX, startY) {
+            const w = canvas.width;
+            const h = canvas.height;
+            let sx = Math.floor(startX);
+            let sy = Math.floor(startY);
+            if (sx < 0 || sy < 0 || sx >= w || sy >= h) return;
+
+            const paint = ctx.getImageData(0, 0, w, h);
+            const P = paint.data;
+            const L = lineCtx.getImageData(0, 0, w, h).data;
+
+            const LINE_ALPHA = 100;   // outline pixels at least this solid block the fill
+            const TOLERANCE = 32;     // how different a pixel may be and still count as "the same area"
+            const SOFT = 96;          // edge pixels this close to the area color get covered too
+            const onLine = (i) => L[i * 4 + 3] >= LINE_ALPHA;
+
+            // A fingertip often lands on the outline itself; use the closest open spot instead.
+            if (onLine(sy * w + sx)) {
+                let found = false;
+                for (let r = 1; r <= 10 && !found; r++) {
+                    for (let dy = -r; dy <= r && !found; dy++) {
+                        for (let dx = -r; dx <= r; dx++) {
+                            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                            const x = sx + dx;
+                            const y = sy + dy;
+                            if (x < 0 || y < 0 || x >= w || y >= h || onLine(y * w + x)) continue;
+                            sx = x;
+                            sy = y;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) return;
+            }
+
+            // Pixel color as seen on the white page (empty paint counts as white).
+            const chan = (i, k) => {
+                const a = P[i * 4 + 3];
+                return a === 255 ? P[i * 4 + k] : (P[i * 4 + k] * a + 255 * (255 - a)) / 255;
+            };
+            const start = sy * w + sx;
+            const tr = chan(start, 0), tg = chan(start, 1), tb = chan(start, 2);
+            const distance = (i) => Math.max(
+                Math.abs(chan(i, 0) - tr), Math.abs(chan(i, 1) - tg), Math.abs(chan(i, 2) - tb));
+
+            const [fr, fg, fb] = hexToRgb(currentColor);
+            if (Math.abs(fr - tr) < 3 && Math.abs(fg - tg) < 3 && Math.abs(fb - tb) < 3) return;   // already this color
+
+            const inArea = (i) => !onLine(i) && distance(i) <= TOLERANCE;
+            const mask = new Uint8Array(w * h);
+
+            // Scanline flood fill.
+            const stack = [sx, sy];
+            while (stack.length) {
+                const y = stack.pop();
+                let x = stack.pop();
+                let i = y * w + x;
+                if (mask[i] || !inArea(i)) continue;
+                while (x > 0 && !mask[i - 1] && inArea(i - 1)) { x--; i--; }
+                let up = false;
+                let down = false;
+                while (x < w && !mask[i] && inArea(i)) {
+                    mask[i] = 1;
+                    if (y > 0) {
+                        const open = !mask[i - w] && inArea(i - w);
+                        if (open && !up) { stack.push(x, y - 1); up = true; } else if (!open) { up = false; }
+                    }
+                    if (y < h - 1) {
+                        const open = !mask[i + w] && inArea(i + w);
+                        if (open && !down) { stack.push(x, y + 1); down = true; } else if (!open) { down = false; }
+                    }
+                    x++;
+                    i++;
+                }
+            }
+
+            // Grow the fill by 2px under outlines and into soft (anti-aliased) edges, so no light halo is left.
+            const canGrow = (i) => L[i * 4 + 3] > 0 || distance(i) <= SOFT;
+            for (let pass = 0; pass < 2; pass++) {
+                const add = [];
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const i = y * w + x;
+                        if (mask[i]) continue;
+                        const touches = (x > 0 && mask[i - 1]) || (x < w - 1 && mask[i + 1]) ||
+                                        (y > 0 && mask[i - w]) || (y < h - 1 && mask[i + w]);
+                        if (touches && canGrow(i)) add.push(i);
+                    }
+                }
+                add.forEach(i => { mask[i] = 1; });
+            }
+
+            for (let i = 0; i < mask.length; i++) {
+                if (mask[i]) {
+                    P[i * 4] = fr;
+                    P[i * 4 + 1] = fg;
+                    P[i * 4 + 2] = fb;
+                    P[i * 4 + 3] = 255;
+                }
+            }
+            ctx.putImageData(paint, 0, 0);
+        }
 
         donePlacementBtn.addEventListener('click', finishPlacement);
 

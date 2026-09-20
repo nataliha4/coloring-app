@@ -396,7 +396,14 @@
                 return;
             }
             isDrawing = true;
-            draw(e);
+            // Leave a dot right away, so a single tap makes a mark.
+            const { x, y } = getPoint(e);
+            ctx.fillStyle = currentColor;
+            ctx.beginPath();
+            ctx.arc(x, y, brushSlider.value / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
         }
 
         function stopDrawing() {
@@ -626,7 +633,10 @@
             { id: 'shapes', icon: '⭐', label: 'Shapes' },
             { id: 'blocks', icon: '🔢', label: 'Blocks' },
             { id: 'soccer', icon: '⚽', label: 'Soccer' },
-            { id: 'words', icon: '🔤', label: 'Words' }
+            { id: 'words', label: 'Words', icon:
+                [['a', '#E53935'], ['b', '#1E88E5'], ['c', '#43A047']].map(([letter, color]) =>
+                    `<span style="display: inline-block; margin: 0 1px; width: 15px; height: 15px; line-height: 15px; border-radius: 4px; background: ${color}; color: white; font: bold 11px system-ui, sans-serif;">${letter}</span>`
+                ).join('') }
         ];
         let activeCategory = 'shapes';
 
@@ -679,7 +689,7 @@
             CATEGORIES.forEach(cat => {
                 const tab = document.createElement('button');
                 tab.className = 'stencil-tab' + (cat.id === activeCategory ? ' active' : '');
-                tab.textContent = cat.icon;
+                tab.innerHTML = cat.icon;
                 tab.setAttribute('aria-label', cat.label);
                 tab.addEventListener('click', () => {
                     activeCategory = cat.id;

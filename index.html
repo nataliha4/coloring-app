@@ -46,6 +46,24 @@
             z-index: 4;
             pointer-events: none;
         }
+        /* Undo: round button floating in the top-right corner of the page */
+        #undoBtn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 6;
+            width: 48px;
+            height: 48px;
+            padding: 0;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #ddd;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #undoBtn:disabled { opacity: 0.35; box-shadow: none; }
         /* Big picture-only buttons shown while a sketch is waiting to be placed */
         #placementControls {
             display: none;
@@ -259,6 +277,10 @@
         <canvas id="lineCanvas"></canvas>
         <canvas id="previewCanvas"></canvas>
 
+        <button id="undoBtn" aria-label="Undo" disabled>
+            <svg viewBox="0 0 24 24" width="28" height="28"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" fill="#546E7A"/></svg>
+        </button>
+
         <!-- Shown while a sketch is waiting to be placed: a big green check and a gray X, no words -->
         <div id="placementControls">
             <button id="cancelPlacementBtn" class="place-btn" aria-label="Cancel">
@@ -341,6 +363,7 @@
         const smallerBtn = document.getElementById('smallerBtn');
         const biggerBtn = document.getElementById('biggerBtn');
         const fillBtn = document.getElementById('fillBtn');
+        const undoBtn = document.getElementById('undoBtn');
         const fillBarColor = document.getElementById('fillBarColor');
         const stencilGrid = document.getElementById('stencilGrid');
         const stencilTabs = document.getElementById('stencilTabs');
@@ -408,6 +431,55 @@
         }
         updateBrushPreview();
 
+        // ---- Undo ----
+        // Before each change we keep a picture of the layer(s) it will touch (colors, outlines, or both).
+        const undoStack = [];
+        const MAX_UNDO = 20;
+
+        function updateUndoButton() {
+            undoBtn.disabled = undoStack.length === 0 || pendingShape !== null;
+        }
+
+        function saveUndo(paintLayer, lineLayer) {
+            undoStack.push({
+                paint: paintLayer ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null,
+                lines: lineLayer ? lineCtx.getImageData(0, 0, lineCanvas.width, lineCanvas.height) : null
+            });
+            if (undoStack.length > MAX_UNDO) undoStack.shift();
+            updateUndoButton();
+        }
+
+        // Put a saved picture back. If the page changed size since (say the phone was turned), scale it to fit.
+        function restoreLayer(layer, layerCtx, data) {
+            if (data.width === layer.width && data.height === layer.height) {
+                layerCtx.putImageData(data, 0, 0);
+                return;
+            }
+            const temp = document.createElement('canvas');
+            temp.width = data.width;
+            temp.height = data.height;
+            temp.getContext('2d').putImageData(data, 0, 0);
+            layerCtx.clearRect(0, 0, layer.width, layer.height);
+            layerCtx.drawImage(temp, 0, 0, layer.width, layer.height);
+        }
+
+        function undo() {
+            if (pendingShape) return;
+            const step = undoStack.pop();
+            if (!step) return;
+            if (step.paint) restoreLayer(canvas, ctx, step.paint);
+            if (step.lines) restoreLayer(lineCanvas, lineCtx, step.lines);
+            updateUndoButton();
+        }
+
+        function isBlank(layerCtx, w, h) {
+            const data = layerCtx.getImageData(0, 0, w, h).data;
+            for (let i = 3; i < data.length; i += 4) {
+                if (data[i] !== 0) return false;
+            }
+            return true;
+        }
+
         // Resize one layer to w x h, keeping what was drawn on it.
         function resizeLayer(layer, w, h) {
             if (layer.width === w && layer.height === h) return;
@@ -457,11 +529,13 @@
                 movePlacement(e);
                 return;
             }
+            if (e.touches && e.touches.length > 1) return;   // a second finger is not a new stroke
             if (currentTool === 'fill') {
                 const point = getPoint(e);
                 floodFill(point.x, point.y);
                 return;
             }
+            saveUndo(true, false);
             isDrawing = true;
             // Leave a dot right away, so a single tap makes a mark.
             const { x, y } = getPoint(e);
@@ -572,6 +646,7 @@
             renderPreview();
             placementControls.style.display = 'flex';
             stencilPanel.style.display = 'none';
+            updateUndoButton();
             if (!marchFrame) marchFrame = requestAnimationFrame(marchTick);
         }
 
@@ -583,11 +658,15 @@
             if (marchFrame) { cancelAnimationFrame(marchFrame); marchFrame = null; }
             renderPreview();
             placementControls.style.display = 'none';
+            updateUndoButton();
         }
 
         function finishPlacement() {
             // Sketch lines go on their own layer above the colors, so coloring never covers them.
-            if (placePoint) drawShape(pendingShape, placePoint.x, placePoint.y, lineCtx, placeScale);
+            if (placePoint) {
+                saveUndo(false, true);
+                drawShape(pendingShape, placePoint.x, placePoint.y, lineCtx, placeScale);
+            }
             endPlacementMode();
         }
 
@@ -602,7 +681,7 @@
             }
         });
 
-        canvas.addEventListener('touchstart', (e) => { startDrawing(e); }, {passive: false});
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, {passive: false});
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, {passive: false});
         canvas.addEventListener('touchend', stopDrawing);
 
@@ -624,6 +703,10 @@
         });
 
         clearBtn.addEventListener('click', () => {
+            const paintBlank = isBlank(ctx, canvas.width, canvas.height);
+            const linesBlank = isBlank(lineCtx, lineCanvas.width, lineCanvas.height);
+            if (paintBlank && linesBlank) return;
+            saveUndo(!paintBlank, !linesBlank);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
         });
@@ -654,6 +737,14 @@
         });
 
         fillBtn.addEventListener('click', () => setTool('fill'));
+
+        undoBtn.addEventListener('click', undo);
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undo();
+            }
+        });
 
         smallerBtn.addEventListener('click', () => scaleBy(1 / 1.2));
         biggerBtn.addEventListener('click', () => scaleBy(1.2));
@@ -1003,6 +1094,7 @@
                     P[i * 4 + 3] = 255;
                 }
             }
+            saveUndo(true, false);   // the canvas still holds the picture from before the fill
             ctx.putImageData(paint, 0, 0);
         }
 

@@ -58,11 +58,12 @@
             font-weight: bold;
             white-space: nowrap;
         }
-        #cancelPlacementBtn {
-            background: #78909C;
+        #cancelPlacementBtn, #donePlacementBtn {
             color: white;
             padding: 8px 12px;
         }
+        #cancelPlacementBtn { background: #78909C; }
+        #donePlacementBtn { background: #24C655; }
         #toolbar {
             background: #ffffff;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
@@ -218,39 +219,17 @@
         <!-- Shown while Roma is choosing where to put a sketch -->
         <div id="placementHint">
             <span>Drag to pick the spot, then let go!</span>
+            <button id="donePlacementBtn">Done</button>
             <button id="cancelPlacementBtn">Cancel</button>
         </div>
 
         <!-- Stencil Selection Panel Layout (Visual Mode for Roma) -->
         <div id="stencilPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
-            <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
+            <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; max-height: 100%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
                 <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Pick a Sketch!</h3>
 
-                <!-- Large icon buttons that don't require reading -->
-                <div style="display: flex; justify-content: space-around; gap: 10px; margin-bottom: 20px;">
-
-                    <!-- Diamond Option -->
-                    <button class="stencil-option" data-shape="diamond" style="background: #e1f5fe; border: 3px solid #00A6FF; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
-                            <polygon points="20,4 36,20 20,36 4,20" fill="none" stroke="#00A6FF" stroke-width="4" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-
-                    <!-- Circle Option -->
-                    <button class="stencil-option" data-shape="circle" style="background: #e8f5e9; border: 3px solid #24C655; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
-                            <circle cx="20" cy="20" r="15" fill="none" stroke="#24C655" stroke-width="4"/>
-                        </svg>
-                    </button>
-
-                    <!-- Star Option -->
-                    <button class="stencil-option" data-shape="star" style="background: #f3e5f5; border: 3px solid #9C27B0; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                        <svg viewBox="0 0 40 40" style="width: 100%; height: 100%; pointer-events: none;">
-                            <polygon points="20,2 25,14 38,14 28,23 32,36 20,28 8,36 12,23 2,14 15,14" fill="none" stroke="#9C27B0" stroke-width="4" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
-
-                </div>
+                <!-- Large icon buttons that don't require reading (built in the script from SHAPES) -->
+                <div id="stencilGrid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 20px;"></div>
 
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
                 <button id="closePanelBtn" style="background: #78909C; color: white; width: 100%; padding: 10px; border-radius: 20px; font-weight: bold; border: none; font-size: 14px;">Cancel</button>
@@ -297,6 +276,8 @@
         const previewCtx = previewCanvas.getContext('2d');
         const placementHint = document.getElementById('placementHint');
         const cancelPlacementBtn = document.getElementById('cancelPlacementBtn');
+        const donePlacementBtn = document.getElementById('donePlacementBtn');
+        const stencilGrid = document.getElementById('stencilGrid');
         const palette = document.getElementById('palette');
         const paletteContainer = document.getElementById('paletteContainer');
         const paletteToggleBtn = document.getElementById('paletteToggleBtn');
@@ -312,7 +293,6 @@
         // Panel Elements
         const stencilPanel = document.getElementById('stencilPanel');
         const closePanelBtn = document.getElementById('closePanelBtn');
-        const stencilOptions = document.querySelectorAll('.stencil-option');
 
         let isDrawing = false;
         let pendingShape = null;   // shape waiting to be placed, or null
@@ -378,6 +358,12 @@
             if (tempCanvas.width > 0 && tempCanvas.height > 0) {
                 ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
             }
+
+            // Resizing blanks the preview canvas, so redraw a shape that is being placed.
+            if (pendingShape) {
+                placePoint = { x: canvas.width / 2, y: canvas.height / 2 };
+                renderPreview();
+            }
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
@@ -423,17 +409,32 @@
             ctx.moveTo(x, y);
         }
 
+        function renderPreview() {
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            if (pendingShape && placePoint) {
+                drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+            }
+        }
+
         function movePlacement(e) {
             placePoint = getPoint(e);
-            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-            drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx);
+            renderPreview();
+        }
+
+        // Show the shape in the middle right away; dragging moves it from there.
+        function startPlacement(shapeType) {
+            pendingShape = shapeType;
+            placePoint = { x: canvas.width / 2, y: canvas.height / 2 };
+            renderPreview();
+            placementHint.style.display = 'flex';
+            stencilPanel.style.display = 'none';
         }
 
         function endPlacementMode() {
             pendingShape = null;
             placePoint = null;
             isPlacing = false;
-            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            renderPreview();
             placementHint.style.display = 'none';
         }
 
@@ -448,8 +449,6 @@
         canvas.addEventListener('mouseleave', () => {
             if (pendingShape) {
                 isPlacing = false;
-                placePoint = null;
-                previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             } else {
                 stopDrawing();
             }
@@ -494,58 +493,71 @@
             brushSizePanel.style.display = 'none';
         });
 
-        function drawShape(shapeType, centerX, centerY, c) {
-            const size = Math.min(canvas.width, canvas.height) * 0.3;
+        // Every sketch is an SVG path on a 100x100 grid, centered on (50, 50).
+        // The same path draws the picker icon and the outline on the canvas.
+        const circlePath = (cx, cy, r) =>
+            `M${cx + r} ${cy} A${r} ${r} 0 1 1 ${cx - r} ${cy} A${r} ${r} 0 1 1 ${cx + r} ${cy} Z`;
+        const polar = (cx, cy, r, deg) =>
+            [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
 
-            c.lineWidth = 3;
+        const starPath = 'M' + Array.from({ length: 10 }, (_, i) =>
+            polar(50, 50, i % 2 === 0 ? 40 : 20, -90 + i * 36).map(n => n.toFixed(1)).join(' ')
+        ).join(' L') + ' Z';
+
+        const sunPath = circlePath(50, 50, 18) + Array.from({ length: 8 }, (_, i) => {
+            const [x1, y1] = polar(50, 50, 28, i * 45);
+            const [x2, y2] = polar(50, 50, 42, i * 45);
+            return ` M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}`;
+        }).join('');
+
+        const flowerPath = Array.from({ length: 5 }, (_, i) => {
+            const [x, y] = polar(50, 38, 22, -90 + i * 72);
+            return circlePath(x, y, 10.5);
+        }).join(' ') + ' ' + circlePath(50, 38, 7) + ' M50 71 V93';
+
+        const SHAPES = {
+            diamond: { color: '#00A6FF', tint: '#e1f5fe', d: 'M50 10 L90 50 L50 90 L10 50 Z' },
+            circle:  { color: '#24C655', tint: '#e8f5e9', d: circlePath(50, 50, 40) },
+            star:    { color: '#9C27B0', tint: '#f3e5f5', d: starPath },
+            heart:   { color: '#E91E63', tint: '#fce4ec', d: 'M50 88 C8 56 6 24 30 16 C42 12 50 22 50 30 C50 22 58 12 70 16 C94 24 92 56 50 88 Z' },
+            house:   { color: '#FF7A00', tint: '#fff3e0', d: 'M10 48 L50 12 L90 48 L78 48 L78 88 L22 88 L22 48 Z M42 88 V62 H58 V88' },
+            fish:    { color: '#007A87', tint: '#e0f7fa', d: 'M10 50 C26 24 62 24 76 50 C62 76 26 76 10 50 Z M76 50 L92 30 L92 70 Z ' + circlePath(30, 46, 3.5) },
+            flower:  { color: '#F9A825', tint: '#fffde7', d: flowerPath },
+            sun:     { color: '#FF5A5F', tint: '#ffebee', d: sunPath },
+            tree:    { color: '#8B5A2B', tint: '#efebe9', d: circlePath(50, 36, 26) + ' M44 62 V90 H56 V62' }
+        };
+
+        function drawShape(shapeType, centerX, centerY, c) {
+            const shape = SHAPES[shapeType];
+            if (!shape) return;
+            const size = Math.min(canvas.width, canvas.height) * 0.3;
+            const scale = size / 40;   // shapes reach 40 units from their center
+
+            c.save();
+            c.translate(centerX, centerY);
+            c.scale(scale, scale);
+            c.translate(-50, -50);
+            c.lineWidth = 3 / scale;
             c.strokeStyle = '#aaaaaa';
             c.lineCap = 'round';
             c.lineJoin = 'round';
-
-            if (shapeType === 'diamond') {
-                c.beginPath();
-                c.moveTo(centerX, centerY - size);
-                c.lineTo(centerX + size, centerY);
-                c.lineTo(centerX, centerY + size);
-                c.lineTo(centerX - size, centerY);
-                c.closePath();
-                c.stroke();
-            } else if (shapeType === 'circle') {
-                c.beginPath();
-                c.arc(centerX, centerY, size, 0, Math.PI * 2);
-                c.stroke();
-            } else if (shapeType === 'star') {
-                c.beginPath();
-                const points = 5;
-                const inset = 0.5;
-                for (let i = 0; i < points * 2; i++) {
-                    const r = (i % 2 === 0) ? size : size * inset;
-                    const angle = (Math.PI * i) / points - Math.PI / 2;
-                    const x = centerX + r * Math.cos(angle);
-                    const y = centerY + r * Math.sin(angle);
-                    if (i === 0) {
-                        c.moveTo(x, y);
-                    } else {
-                        c.lineTo(x, y);
-                    }
-                }
-                c.closePath();
-                c.stroke();
-            }
-            c.beginPath();
+            c.stroke(new Path2D(shape.d));
+            c.restore();
         }
 
-        cancelPlacementBtn.addEventListener('click', endPlacementMode);
-
-        stencilOptions.forEach(option => {
-            option.addEventListener('click', (e) => {
-                const button = e.target.closest('.stencil-option');
-                const selectedShape = button.getAttribute('data-shape');
-                pendingShape = selectedShape;
-                placementHint.style.display = 'flex';
-                stencilPanel.style.display = 'none';
-            });
+        Object.entries(SHAPES).forEach(([name, shape]) => {
+            const button = document.createElement('button');
+            button.className = 'stencil-option';
+            button.setAttribute('aria-label', name);
+            button.style.cssText = `background: ${shape.tint}; border: 3px solid ${shape.color}; border-radius: 15px; padding: 10px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer;`;
+            button.innerHTML = `<svg viewBox="0 0 100 100" style="width: 100%; height: 100%; pointer-events: none;"><path d="${shape.d}" fill="none" stroke="${shape.color}" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+            button.addEventListener('click', () => startPlacement(name));
+            stencilGrid.appendChild(button);
         });
+
+        donePlacementBtn.addEventListener('click', finishPlacement);
+
+        cancelPlacementBtn.addEventListener('click', endPlacementMode);
     </script>
 </body>
 </html>

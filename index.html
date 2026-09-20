@@ -123,8 +123,60 @@
         #clearBtn:active {
             background: #546E7A;
         }
-        input[type="range"] {
-            width: 70px;
+        #brushSizeBtn {
+            background: #f0f2f5;
+            border: 2px solid #ddd;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .brush-preview-small {
+            border-radius: 50%;
+            display: block;
+        }
+        .big-slider {
+            width: 100%;
+            height: 44px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            margin: 10px 0;
+        }
+        .big-slider::-webkit-slider-runnable-track {
+            height: 10px;
+            border-radius: 5px;
+            background: #e0e0e0;
+        }
+        .big-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #FF9F43;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            margin-top: -13px;
+            cursor: pointer;
+        }
+        .big-slider::-moz-range-track {
+            height: 10px;
+            border-radius: 5px;
+            background: #e0e0e0;
+        }
+        .big-slider::-moz-range-thumb {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #FF9F43;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
         }
     </style>
 </head>
@@ -168,6 +220,22 @@
                 <button id="closePanelBtn" style="background: #78909C; color: white; width: 100%; padding: 10px; border-radius: 20px; font-weight: bold; border: none; font-size: 14px;">Cancel</button>
             </div>
         </div>
+
+        <!-- Brush Size Panel (large touch-friendly control) -->
+        <div id="brushSizePanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
+            <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
+                <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Brush Size</h3>
+
+                <div style="width: 90px; height: 90px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
+                    <div id="brushPreviewDot" style="border-radius: 50%;"></div>
+                </div>
+
+                <input type="range" id="brushSize" class="big-slider" min="2" max="30" value="8">
+
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0 15px;">
+                <button id="closeBrushPanelBtn" style="background: #78909C; color: white; width: 100%; padding: 12px; border-radius: 20px; font-weight: bold; border: none; font-size: 16px;">Done</button>
+            </div>
+        </div>
     </div>
 
     <div id="toolbar">
@@ -175,7 +243,9 @@
             <div class="palette" id="palette"></div>
         </div>
         <div class="controls">
-            <input type="range" id="brushSize" min="2" max="30" value="8">
+            <button id="brushSizeBtn" aria-label="Brush size">
+                <span id="brushPreviewSmall" class="brush-preview-small"></span>
+            </button>
             <div class="btn-group">
                 <button id="paletteToggleBtn">Open Palette</button>
                 <button id="loadBtn">Open Sketch</button>
@@ -193,6 +263,11 @@
         const clearBtn = document.getElementById('clearBtn');
         const loadBtn = document.getElementById('loadBtn');
         const brushSlider = document.getElementById('brushSize');
+        const brushSizeBtn = document.getElementById('brushSizeBtn');
+        const brushSizePanel = document.getElementById('brushSizePanel');
+        const closeBrushPanelBtn = document.getElementById('closeBrushPanelBtn');
+        const brushPreviewDot = document.getElementById('brushPreviewDot');
+        const brushPreviewSmall = document.getElementById('brushPreviewSmall');
 
         // Panel Elements
         const stencilPanel = document.getElementById('stencilPanel');
@@ -218,9 +293,24 @@
                 if (activeSwatch) activeSwatch.classList.remove('active');
                 swatch.classList.add('active');
                 currentColor = color;
+                updateBrushPreview();
             });
             palette.appendChild(swatch);
         });
+
+        function updateBrushPreview() {
+            const size = brushSlider.value;
+            const smallSize = Math.max(4, Math.min(26, size));
+            brushPreviewSmall.style.width = `${smallSize}px`;
+            brushPreviewSmall.style.height = `${smallSize}px`;
+            brushPreviewSmall.style.backgroundColor = currentColor;
+
+            const bigSize = Math.max(6, Math.min(80, size * 2));
+            brushPreviewDot.style.width = `${bigSize}px`;
+            brushPreviewDot.style.height = `${bigSize}px`;
+            brushPreviewDot.style.backgroundColor = currentColor;
+        }
+        updateBrushPreview();
 
         function resizeCanvas() {
             const tempCanvas = document.createElement('canvas');
@@ -307,6 +397,16 @@
 
         closePanelBtn.addEventListener('click', () => {
             stencilPanel.style.display = 'none';
+        });
+
+        brushSlider.addEventListener('input', updateBrushPreview);
+
+        brushSizeBtn.addEventListener('click', () => {
+            brushSizePanel.style.display = 'flex';
+        });
+
+        closeBrushPanelBtn.addEventListener('click', () => {
+            brushSizePanel.style.display = 'none';
         });
 
         function drawShape(shapeType) {

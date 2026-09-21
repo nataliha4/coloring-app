@@ -75,7 +75,6 @@
             gap: 16px;
             align-items: center;
         }
-        body.palette-open #placementControls { bottom: 96px; }
         .place-btn {
             width: 68px;
             height: 68px;
@@ -124,35 +123,19 @@
             gap: 10px;
             position: relative;
         }
-        .palette-container {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            right: 0;
-            padding: 8px 10px;
-            background: #ffffff;
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.08);
-        }
-        .palette {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 5px 0;
-            width: 100%;
-            justify-content: flex-start;
-            scrollbar-width: none;
-        }
-        .palette::-webkit-scrollbar {
-            display: none;
+        /* Color popup: a big grid of round swatches, plus (for the brush) four size dots */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 56px));
+            gap: 12px;
+            justify-content: center;
         }
         .color-swatch {
-            width: 42px;
-            height: 42px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
             border-radius: 50%;
             border: 3px solid #ddd;
             cursor: pointer;
-            flex-shrink: 0;
             transition: transform 0.1s ease;
             display: flex;
             align-items: center;
@@ -160,7 +143,32 @@
         }
         .color-swatch.active {
             border-color: #333;
-            transform: scale(1.15);
+            transform: scale(1.12);
+        }
+        .size-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 64px));
+            gap: 10px;
+            justify-content: center;
+        }
+        .size-dot-btn {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            padding: 0;
+            border-radius: 50%;
+            background: #f0f2f5;
+            border: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .size-dot-btn.active {
+            border-color: #FF9F43;
+            background: #fff3e0;
+        }
+        .size-dot-btn span {
+            display: block;
+            border-radius: 50%;
         }
         .controls {
             display: flex;
@@ -171,12 +179,18 @@
         }
         .btn-group {
             display: flex;
-            gap: 6px;
+            gap: 10px;
             flex: 1;
             justify-content: flex-end;
         }
         .btn-group button {
-            padding: 10px 12px;
+            width: 52px;
+            height: 52px;
+            padding: 0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         button {
             padding: 10px 14px;
@@ -186,14 +200,6 @@
             cursor: pointer;
             font-size: 13px;
             white-space: nowrap;
-        }
-        #paletteToggleBtn {
-            background: #FF9F43;
-            color: white;
-            flex: 1;
-        }
-        #paletteToggleBtn:active {
-            background: #EE5A24;
         }
         #loadBtn {
             background: #24C655;
@@ -205,9 +211,6 @@
         #clearBtn {
             background: #78909C;
             color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         #clearBtn:active {
             background: #546E7A;
@@ -215,8 +218,8 @@
         #brushSizeBtn, #fillBtn {
             background: #f0f2f5;
             border: 2px solid #ddd;
-            width: 44px;
-            height: 44px;
+            width: 52px;
+            height: 52px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -231,45 +234,6 @@
         .brush-preview-small {
             border-radius: 50%;
             display: block;
-        }
-        .big-slider {
-            width: 100%;
-            height: 44px;
-            -webkit-appearance: none;
-            appearance: none;
-            background: transparent;
-            margin: 10px 0;
-        }
-        .big-slider::-webkit-slider-runnable-track {
-            height: 10px;
-            border-radius: 5px;
-            background: #e0e0e0;
-        }
-        .big-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #FF9F43;
-            border: 3px solid white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            margin-top: -13px;
-            cursor: pointer;
-        }
-        .big-slider::-moz-range-track {
-            height: 10px;
-            border-radius: 5px;
-            background: #e0e0e0;
-        }
-        .big-slider::-moz-range-thumb {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: #FF9F43;
-            border: 3px solid white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
         }
     </style>
 </head>
@@ -314,27 +278,22 @@
             </div>
         </div>
 
-        <!-- Brush Size Panel (large touch-friendly control) -->
-        <div id="brushSizePanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
-            <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
-                <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Brush Size</h3>
-
-                <div style="width: 90px; height: 90px; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
-                    <div id="brushPreviewDot" style="border-radius: 50%;"></div>
+        <!-- Color popup, opened by the brush and the bucket. The brush version also shows sizes and a check to close. -->
+        <div id="colorPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
+            <div style="background: white; border-radius: 20px; padding: 20px; width: 95%; max-width: 340px; max-height: 100%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
+                <div id="palette" class="color-grid"></div>
+                <div id="sizeSection">
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 18px 0;">
+                    <div id="sizeRow" class="size-row"></div>
                 </div>
-
-                <input type="range" id="brushSize" class="big-slider" min="2" max="30" value="8">
-
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0 15px;">
-                <button id="closeBrushPanelBtn" style="background: #78909C; color: white; width: 100%; padding: 12px; border-radius: 20px; font-weight: bold; border: none; font-size: 16px;">Done</button>
+                <button id="closeColorPanelBtn" class="place-btn" aria-label="Done" style="background: #24C655; margin: 18px auto 0;">
+                    <svg viewBox="0 0 24 24" width="38" height="38"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
             </div>
         </div>
     </div>
 
     <div id="toolbar">
-        <div class="palette-container" id="paletteContainer">
-            <div class="palette" id="palette"></div>
-        </div>
         <div class="controls">
             <button id="brushSizeBtn" class="active" aria-label="Brush">
                 <span id="brushPreviewSmall" class="brush-preview-small"></span>
@@ -346,8 +305,9 @@
                 </svg>
             </button>
             <div class="btn-group">
-                <button id="paletteToggleBtn">Colors</button>
-                <button id="loadBtn">Sketch</button>
+                <button id="loadBtn" aria-label="Sketches">
+                    <svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="white"/></svg>
+                </button>
                 <button id="clearBtn" aria-label="Clear page" title="Clear page">
                     <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; pointer-events: none;">
                         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="white"/>
@@ -375,15 +335,13 @@
         const stencilGrid = document.getElementById('stencilGrid');
         const stencilTabs = document.getElementById('stencilTabs');
         const palette = document.getElementById('palette');
-        const paletteContainer = document.getElementById('paletteContainer');
-        const paletteToggleBtn = document.getElementById('paletteToggleBtn');
+        const colorPanel = document.getElementById('colorPanel');
+        const sizeSection = document.getElementById('sizeSection');
+        const sizeRow = document.getElementById('sizeRow');
+        const closeColorPanelBtn = document.getElementById('closeColorPanelBtn');
         const clearBtn = document.getElementById('clearBtn');
         const loadBtn = document.getElementById('loadBtn');
-        const brushSlider = document.getElementById('brushSize');
         const brushSizeBtn = document.getElementById('brushSizeBtn');
-        const brushSizePanel = document.getElementById('brushSizePanel');
-        const closeBrushPanelBtn = document.getElementById('closeBrushPanelBtn');
-        const brushPreviewDot = document.getElementById('brushPreviewDot');
         const brushPreviewSmall = document.getElementById('brushPreviewSmall');
 
         // Panel Elements
@@ -398,6 +356,7 @@
         let pinch = null;          // {startDist, startScale} while two fingers are down
         let currentTool = 'brush'; // 'brush' or 'fill'
         let currentColor = '#FF5A5F';
+        let brushSize = 12;
 
         const colors = [
             '#FF5A5F', '#FF7A00', '#FFB400', '#FFE600',
@@ -419,22 +378,39 @@
                 swatch.classList.add('active');
                 currentColor = color;
                 updateBrushPreview();
+                if (currentTool === 'fill') closeColorPanel();   // fill only needs a color, so get out of the way
             });
             palette.appendChild(swatch);
         });
 
+        // Four brush sizes, shown as dots instead of a slider.
+        const BRUSH_SIZES = [6, 12, 20, 30];
+        const sizeDots = BRUSH_SIZES.map(size => {
+            const button = document.createElement('button');
+            button.className = 'size-dot-btn';
+            button.setAttribute('aria-label', 'Brush size');
+            const dot = document.createElement('span');
+            dot.style.width = dot.style.height = `${Math.round(size * 1.3)}px`;
+            button.appendChild(dot);
+            button.addEventListener('click', () => {
+                brushSize = size;
+                updateBrushPreview();
+            });
+            sizeRow.appendChild(button);
+            return { size, button, dot };
+        });
+
+        // Keep everything that shows the current color and size in step.
         function updateBrushPreview() {
-            const size = brushSlider.value;
-            const smallSize = Math.max(4, Math.min(26, size));
+            const smallSize = Math.max(6, Math.min(30, brushSize));
             brushPreviewSmall.style.width = `${smallSize}px`;
             brushPreviewSmall.style.height = `${smallSize}px`;
             brushPreviewSmall.style.backgroundColor = currentColor;
-
-            const bigSize = Math.max(6, Math.min(80, size * 2));
-            brushPreviewDot.style.width = `${bigSize}px`;
-            brushPreviewDot.style.height = `${bigSize}px`;
-            brushPreviewDot.style.backgroundColor = currentColor;
             fillBarColor.setAttribute('fill', currentColor);
+            sizeDots.forEach(({ size, button, dot }) => {
+                button.classList.toggle('active', size === brushSize);
+                dot.style.backgroundColor = currentColor;
+            });
         }
         updateBrushPreview();
 
@@ -548,7 +524,7 @@
             const { x, y } = getPoint(e);
             ctx.fillStyle = currentColor;
             ctx.beginPath();
-            ctx.arc(x, y, brushSlider.value / 2, 0, Math.PI * 2);
+            ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.beginPath();
             ctx.moveTo(x, y);
@@ -572,7 +548,7 @@
             if (!isDrawing) return;
             const { x, y } = getPoint(e);
 
-            ctx.lineWidth = brushSlider.value;
+            ctx.lineWidth = brushSize;
             ctx.strokeStyle = currentColor;
             ctx.lineTo(x, y);
             ctx.stroke();
@@ -699,16 +675,6 @@
             scaleBy(Math.exp(-e.deltaY * (e.ctrlKey ? 0.02 : 0.005)));
         }, {passive: false});
 
-        paletteToggleBtn.addEventListener('click', () => {
-            if (paletteContainer.style.display === 'block') {
-                paletteContainer.style.display = 'none';
-                document.body.classList.remove('palette-open');
-            } else {
-                paletteContainer.style.display = 'block';
-                document.body.classList.add('palette-open');
-            }
-        });
-
         clearBtn.addEventListener('click', () => {
             const paintBlank = isBlank(ctx, canvas.width, canvas.height);
             const linesBlank = isBlank(lineCtx, lineCanvas.width, lineCanvas.height);
@@ -726,24 +692,38 @@
             stencilPanel.style.display = 'none';
         });
 
-        brushSlider.addEventListener('input', updateBrushPreview);
-
         function setTool(tool) {
             currentTool = tool;
             brushSizeBtn.classList.toggle('active', tool === 'brush');
             fillBtn.classList.toggle('active', tool === 'fill');
         }
 
-        // Tapping the brush picks it; tapping it again opens the size panel.
+        // Picking a tool opens its popup right away: colors (and sizes for the brush), or just colors for the bucket.
+        function openColorPanel() {
+            const isBrush = currentTool === 'brush';
+            sizeSection.style.display = isBrush ? 'block' : 'none';
+            closeColorPanelBtn.style.display = isBrush ? 'flex' : 'none';
+            colorPanel.style.display = 'flex';
+        }
+
+        function closeColorPanel() {
+            colorPanel.style.display = 'none';
+        }
+
         brushSizeBtn.addEventListener('click', () => {
-            if (currentTool !== 'brush') {
-                setTool('brush');
-            } else {
-                brushSizePanel.style.display = 'flex';
-            }
+            setTool('brush');
+            openColorPanel();
         });
 
-        fillBtn.addEventListener('click', () => setTool('fill'));
+        fillBtn.addEventListener('click', () => {
+            setTool('fill');
+            openColorPanel();
+        });
+
+        closeColorPanelBtn.addEventListener('click', closeColorPanel);
+        colorPanel.addEventListener('click', (e) => {
+            if (e.target === colorPanel) closeColorPanel();   // tapping the dark area closes it
+        });
 
         undoBtn.addEventListener('click', undo);
         document.addEventListener('keydown', (e) => {
@@ -755,10 +735,6 @@
 
         smallerBtn.addEventListener('click', () => scaleBy(1 / 1.2));
         biggerBtn.addEventListener('click', () => scaleBy(1.2));
-
-        closeBrushPanelBtn.addEventListener('click', () => {
-            brushSizePanel.style.display = 'none';
-        });
 
         // Every sketch is an SVG path on a 100x100 grid, centered on (50, 50).
         // The same path draws the picker icon and the outline on the canvas.

@@ -278,7 +278,7 @@
             </div>
         </div>
 
-        <!-- Color popup, opened by the brush and the bucket. The brush version also shows sizes and a check to close. -->
+        <!-- Color popup, opened by the brush and the bucket. The brush version also shows sizes. Any pick closes it. -->
         <div id="colorPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
             <div style="background: white; border-radius: 20px; padding: 20px; width: 95%; max-width: 340px; max-height: 100%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
                 <div id="palette" class="color-grid"></div>
@@ -286,9 +286,6 @@
                     <hr style="border: 0; border-top: 1px solid #eee; margin: 18px 0;">
                     <div id="sizeRow" class="size-row"></div>
                 </div>
-                <button id="closeColorPanelBtn" class="place-btn" aria-label="Done" style="background: #24C655; margin: 18px auto 0;">
-                    <svg viewBox="0 0 24 24" width="38" height="38"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
             </div>
         </div>
     </div>
@@ -338,7 +335,6 @@
         const colorPanel = document.getElementById('colorPanel');
         const sizeSection = document.getElementById('sizeSection');
         const sizeRow = document.getElementById('sizeRow');
-        const closeColorPanelBtn = document.getElementById('closeColorPanelBtn');
         const clearBtn = document.getElementById('clearBtn');
         const loadBtn = document.getElementById('loadBtn');
         const brushSizeBtn = document.getElementById('brushSizeBtn');
@@ -378,7 +374,7 @@
                 swatch.classList.add('active');
                 currentColor = color;
                 updateBrushPreview();
-                if (currentTool === 'fill') closeColorPanel();   // fill only needs a color, so get out of the way
+                closeColorPanel();   // one pick, then straight back to the picture
             });
             palette.appendChild(swatch);
         });
@@ -395,6 +391,7 @@
             button.addEventListener('click', () => {
                 brushSize = size;
                 updateBrushPreview();
+                closeColorPanel();
             });
             sizeRow.appendChild(button);
             return { size, button, dot };
@@ -699,10 +696,10 @@
         }
 
         // Picking a tool opens its popup right away: colors (and sizes for the brush), or just colors for the bucket.
+        // Each pick closes the popup; tapping the tool again reopens it.
         function openColorPanel() {
             const isBrush = currentTool === 'brush';
             sizeSection.style.display = isBrush ? 'block' : 'none';
-            closeColorPanelBtn.style.display = isBrush ? 'flex' : 'none';
             colorPanel.style.display = 'flex';
         }
 
@@ -720,7 +717,6 @@
             openColorPanel();
         });
 
-        closeColorPanelBtn.addEventListener('click', closeColorPanel);
         colorPanel.addEventListener('click', (e) => {
             if (e.target === colorPanel) closeColorPanel();   // tapping the dark area closes it
         });

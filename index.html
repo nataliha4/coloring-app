@@ -65,8 +65,8 @@
         }
         #undoBtn:disabled { opacity: 0.35; box-shadow: none; }
         .stencil-tab {
-            font-size: 26px;
-            width: 46px;
+            font-size: 24px;
+            width: 38px;
             height: 48px;
             padding: 0;
             background: #f0f2f5;
@@ -216,7 +216,7 @@
                 <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Pick a Sketch!</h3>
 
                 <!-- Large icon buttons that don't require reading (built in the script from SHAPES) -->
-                <div id="stencilTabs" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 16px;"></div>
+                <div id="stencilTabs" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-bottom: 16px;"></div>
                 <div id="stencilGrid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 80px)); justify-content: center; gap: 12px;"></div>
             </div>
         </div>
@@ -837,6 +837,61 @@
             'M50 8 C66 22 70 44 66 66 H34 C30 44 34 22 50 8 Z ' + circlePath(50, 38, 8) +
             ' M34 52 L20 72 L34 66 M66 52 L80 72 L66 66 M40 66 H60 L56 76 H44 Z M44 76 Q50 94 56 76 Z';
 
+        // Ninjago-style ninja figures: a shared body, plus a head, hat or hair and a chest emblem for each hero.
+        const NINJA_BODY =
+            'M32 46 H68 V76 H32 Z M22 48 H32 V72 H22 Z M68 48 H78 V72 H68 Z M33 76 H67 V93 H33 Z M50 76 V93 ' +
+            'M32 68 H68 M46 66 H54 V70 H46 Z ' + circlePath(27, 76, 4.5) + ' ' + circlePath(73, 76, 4.5);
+        const HEAD_OUTLINE = 'M34 14 H66 Q70 14 70 18 V40 Q70 44 66 44 H34 Q30 44 30 40 V18 Q30 14 34 14 Z';
+        const HOOD_FACE = HEAD_OUTLINE +
+            ' M39 22 H61 Q63 22 63 24 V35 Q63 37 61 37 H39 Q37 37 37 35 V24 Q37 22 39 22 Z ' +
+            circlePath(45.5, 29, 1.8) + ' ' + circlePath(54.5, 29, 1.8) + ' M46 33 Q50 35.5 54 33';
+        const STUD = ' M43 14 V8 H57 V14';
+        // Chest emblems stay well clear of the chest's top and belt lines, so the chest is one area to fill.
+        const EMBLEM = {
+            flame: 'M52 50 C50 54 57 57 56 61 C56 65 44 65 44 60 C44 57 47 56 48 53 C49 55 51 55 52 50 Z',
+            bolt: 'M53 50 L45 58 H50 L47 65 L56 56 H51 Z',
+            mountain: 'M43 64 L50 51 L57 64 Z M47 58 L50 61 L53 58',
+            snow: 'M50 50 V64 M43 53 L57 61 M43 61 L57 53',
+            spark: 'M50 50 L52.5 55 L58 57 L52.5 59.5 L50 65 L47.5 59.5 L42 57 L47.5 55 Z',
+            drop: 'M50 50 C52 54 56 57 56 60 C56 63 53 65 50 65 C47 65 44 63 44 60 C44 57 48 54 50 50 Z',
+            gear: circlePath(50, 57, 7) + ' ' + circlePath(50, 57, 2.5),
+            wind: 'M43 53 Q46.5 50 50 53 T57 53 M43 58 Q46.5 55 50 58 T57 58 M43 63 Q46.5 60 50 63 T57 63'
+        };
+        const ninja = (head, emblem) => NINJA_BODY + ' ' + head + (emblem ? ' ' + EMBLEM[emblem] : '');
+        const ninjaPaths = {
+            kai:   ninja(HOOD_FACE + ' M34 14 L37 5 L43 11 L50 3 L57 11 L63 5 L66 14', 'flame'),
+            jay:   ninja(HOOD_FACE + STUD, 'bolt'),
+            cole:  ninja(HOOD_FACE + STUD, 'mountain'),
+            zane:  ninja(HOOD_FACE + STUD + ' M30 19 H70', 'snow'),
+            lloyd: ninja(HOOD_FACE + STUD, 'spark'),
+            nya:   ninja(HOOD_FACE + STUD + ' M70 18 Q86 18 83 34 Q81 44 70 40', 'drop'),
+            wu:    ninja('M20 24 L50 3 L80 24 Z M30 24 V40 Q30 44 34 44 H66 Q70 44 70 40 V24 ' +
+                         circlePath(44, 31, 1.8) + ' ' + circlePath(56, 31, 1.8) + ' M40 44 L50 62 L60 44', null),
+            pixal: ninja(HEAD_OUTLINE + ' M34 24 H66 V34 H34 Z M40 29 H60 M50 14 V6 ' + circlePath(50, 4, 2.5), 'gear'),
+            morro: ninja(HOOD_FACE + ' M34 14 L50 2 L66 14 M68 46 L86 48 L78 54 L90 60 L76 62 L70 58', 'wind')
+        };
+        const ninjaStyle = {
+            kai:   ['Kai', '#E53935', '#ffebee'],   jay:   ['Jay', '#1E88E5', '#e3f2fd'],
+            cole:  ['Cole', '#37474F', '#eceff1'],  zane:  ['Zane', '#78909C', '#eceff1'],
+            lloyd: ['Lloyd', '#43A047', '#e8f5e9'], nya:   ['Nya', '#00ACC1', '#e0f7fa'],
+            wu:    ['Wu', '#F9A825', '#fffde7'],    pixal: ['Pixal', '#EC407A', '#fce4ec'],
+            morro: ['Morro', '#00796B', '#e0f2f1']
+        };
+        // Each hero as a figure, plus their name as a word (the name buttons are only shown in the Ninja tab).
+        const ninjaShapes = {};
+        Object.entries(ninjaStyle).forEach(([key, [name, color, tint]]) => {
+            ninjaShapes[`ninja_${key}`] = { cat: 'ninja', label: name, color, tint, iconStroke: 3.5, d: ninjaPaths[key] };
+            ninjaShapes[`ninjaname_${key}`] = { cat: 'ninja-name', label: name, word: name, color, tint };
+        });
+        // Picker order for the Ninja tab: a row of three figures, then the row of their names right underneath.
+        const ninjaOrder = [];
+        const ninjaKeys = Object.keys(ninjaStyle);
+        for (let i = 0; i < ninjaKeys.length; i += 3) {
+            const row = ninjaKeys.slice(i, i + 3);
+            row.forEach(k => ninjaOrder.push(`ninja_${k}`));
+            row.forEach(k => ninjaOrder.push(`ninjaname_${k}`));
+        }
+
         // Words to color in. Drawn as hollow outline letters in a friendly, rounded system font.
         const WORD_FONT = "'Chalkboard SE', 'Comic Sans MS', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif";
         const wordColors = [
@@ -890,6 +945,7 @@
             train:      { cat: 'vehicles', label: 'Train', color: '#43A047', tint: '#e8f5e9', iconStroke: 4.5, d: trainPath },
             rocket:     { cat: 'vehicles', label: 'Rocket', color: '#E91E63', tint: '#fce4ec', iconStroke: 4.5, d: rocketPath },
 
+            ...ninjaShapes,
             ...blockShapes,
             ...wordShapes
         };
@@ -900,8 +956,9 @@
             { id: 'blocks', icon: '🔢', label: 'Blocks' },
             { id: 'soccer', icon: '⚽', label: 'Soccer' },
             { id: 'vehicles', icon: '🚗', label: 'Vehicles' },
+            { id: 'ninja', icon: '🥷', label: 'Ninja', items: ninjaOrder },
             { id: 'words', label: 'Words', icon:
-                `<span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #E53935; color: white; font: bold 24px/1 ${WORD_FONT};">R</span>` }
+                `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: #E53935; color: white; font: bold 20px/1 ${WORD_FONT};">R</span>` }
         ];
         let activeCategory = 'shapes';
 
@@ -992,23 +1049,25 @@
                 stencilTabs.appendChild(tab);
             });
 
-            Object.entries(SHAPES)
-                .filter(([, shape]) => shape.cat === activeCategory)
-                .forEach(([name, shape]) => {
-                    const button = document.createElement('button');
-                    button.className = 'stencil-option';
-                    button.dataset.shape = name;
-                    button.setAttribute('aria-label', shape.label || name);
-                    button.style.cssText = `background: ${shape.tint}; border: 3px solid ${shape.color}; border-radius: 15px; padding: 10px; width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; cursor: pointer;`;
-                    button.style.position = 'relative';
-                    const fontPx = shape.word ? (shape.word.length <= 3 ? 28 : shape.word.length === 4 ? 23 : 18) : 0;
-                    button.innerHTML = (shape.word
-                        ? `<span style="font: bold ${fontPx}px ${WORD_FONT}; color: ${shape.color}; pointer-events: none;">${shape.word}</span>`
-                        : `<svg viewBox="0 0 100 100" style="width: 100%; height: 100%; pointer-events: none;"><path d="${shape.d}" fill="none" stroke="${shape.color}" stroke-width="${shape.iconStroke || 6}" stroke-linejoin="round" stroke-linecap="round"/></svg>`) +
-                        (shape.badge ? `<span style="position: absolute; right: 6px; bottom: 2px; font-size: 16px; font-weight: bold; color: ${shape.color}; pointer-events: none;">${shape.badge}</span>` : '');
-                    button.addEventListener('click', () => startPlacement(name));
-                    stencilGrid.appendChild(button);
-                });
+            const activeDef = CATEGORIES.find(cat => cat.id === activeCategory);
+            const entries = activeDef.items
+                ? activeDef.items.map(name => [name, SHAPES[name]])
+                : Object.entries(SHAPES).filter(([, shape]) => shape.cat === activeCategory);
+            entries.forEach(([name, shape]) => {
+                const button = document.createElement('button');
+                button.className = 'stencil-option';
+                button.dataset.shape = name;
+                button.setAttribute('aria-label', shape.label || name);
+                button.style.cssText = `background: ${shape.tint}; border: 3px solid ${shape.color}; border-radius: 15px; padding: 10px; width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; cursor: pointer;`;
+                button.style.position = 'relative';
+                const fontPx = shape.word ? (shape.word.length <= 3 ? 28 : shape.word.length === 4 ? 23 : 18) : 0;
+                button.innerHTML = (shape.word
+                    ? `<span style="font: bold ${fontPx}px ${WORD_FONT}; color: ${shape.color}; pointer-events: none;">${shape.word}</span>`
+                    : `<svg viewBox="0 0 100 100" style="width: 100%; height: 100%; pointer-events: none;"><path d="${shape.d}" fill="none" stroke="${shape.color}" stroke-width="${shape.iconStroke || 6}" stroke-linejoin="round" stroke-linecap="round"/></svg>`) +
+                    (shape.badge ? `<span style="position: absolute; right: 6px; bottom: 2px; font-size: 16px; font-weight: bold; color: ${shape.color}; pointer-events: none;">${shape.badge}</span>` : '');
+                button.addEventListener('click', () => startPlacement(name));
+                stencilGrid.appendChild(button);
+            });
         }
         renderStencilPicker();
 

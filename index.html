@@ -64,40 +64,6 @@
             justify-content: center;
         }
         #undoBtn:disabled { opacity: 0.35; box-shadow: none; }
-        /* Big picture-only buttons shown while a sketch is waiting to be placed */
-        #placementControls {
-            display: none;
-            position: absolute;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 5;
-            gap: 16px;
-            align-items: center;
-        }
-        .place-btn {
-            width: 68px;
-            height: 68px;
-            padding: 0;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
-        }
-        .size-btn {
-            width: 52px;
-            height: 52px;
-            padding: 0;
-            border-radius: 50%;
-            background: #FF9F43;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
-        }
-        #donePlacementBtn { background: #24C655; }
-        #cancelPlacementBtn { background: #78909C; }
         .stencil-tab {
             font-size: 26px;
             width: 58px;
@@ -248,22 +214,6 @@
             <svg viewBox="0 0 24 24" width="28" height="28"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" fill="#546E7A"/></svg>
         </button>
 
-        <!-- Shown while a sketch is waiting to be placed: a big green check and a gray X, no words -->
-        <div id="placementControls">
-            <button id="cancelPlacementBtn" class="place-btn" aria-label="Cancel">
-                <svg viewBox="0 0 24 24" width="34" height="34"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
-            </button>
-            <button id="smallerBtn" class="size-btn" aria-label="Smaller">
-                <svg viewBox="0 0 24 24" width="28" height="28"><path d="M5 12h14" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
-            </button>
-            <button id="biggerBtn" class="size-btn" aria-label="Bigger">
-                <svg viewBox="0 0 24 24" width="28" height="28"><path d="M5 12h14M12 5v14" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg>
-            </button>
-            <button id="donePlacementBtn" class="place-btn" aria-label="Done">
-                <svg viewBox="0 0 24 24" width="38" height="38"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-        </div>
-
         <!-- Stencil Selection Panel Layout (Visual Mode for Roma) -->
         <div id="stencilPanel" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20; justify-content: center; align-items: center; padding: 20px;">
             <div style="background: white; border-radius: 20px; padding: 25px; width: 95%; max-width: 340px; max-height: 100%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;">
@@ -321,11 +271,6 @@
         const lineCtx = lineCanvas.getContext('2d');
         const previewCanvas = document.getElementById('previewCanvas');
         const previewCtx = previewCanvas.getContext('2d');
-        const placementControls = document.getElementById('placementControls');
-        const cancelPlacementBtn = document.getElementById('cancelPlacementBtn');
-        const donePlacementBtn = document.getElementById('donePlacementBtn');
-        const smallerBtn = document.getElementById('smallerBtn');
-        const biggerBtn = document.getElementById('biggerBtn');
         const fillBtn = document.getElementById('fillBtn');
         const undoBtn = document.getElementById('undoBtn');
         const fillBarColor = document.getElementById('fillBarColor');
@@ -347,7 +292,10 @@
         let isDrawing = false;
         let pendingShape = null;   // shape waiting to be placed, or null
         let placePoint = null;     // where the shape would land right now
-        let isPlacing = false;     // finger/mouse is down while placing
+        let isPlacing = false;     // finger/mouse is dragging or pinching the waiting shape
+        let dragOffset = null;     // while dragging: how far the finger is from the shape's center
+        let outsideTap = null;     // a touch that began away from the shape; if it ends as a tap, the shape is placed
+        let placeBox = null;       // where the waiting shape is on screen (for hit-testing)
         let placeScale = 1;        // how much bigger/smaller than normal the waiting shape is
         let pinch = null;          // {startDist, startScale} while two fingers are down
         let currentTool = 'brush'; // 'brush' or 'fill'
@@ -417,7 +365,7 @@
         const MAX_UNDO = 20;
 
         function updateUndoButton() {
-            undoBtn.disabled = undoStack.length === 0 || pendingShape !== null;
+            undoBtn.disabled = undoStack.length === 0 && pendingShape === null;
         }
 
         function saveUndo(paintLayer, lineLayer) {
@@ -444,7 +392,11 @@
         }
 
         function undo() {
-            if (pendingShape) return;
+            // While a sketch is still waiting (dashed border), Undo simply throws it away.
+            if (pendingShape) {
+                endPlacementMode();
+                return;
+            }
             const step = undoStack.pop();
             if (!step) return;
             if (step.paint) restoreLayer(canvas, ctx, step.paint);
@@ -505,8 +457,7 @@
 
         function startDrawing(e) {
             if (pendingShape) {
-                isPlacing = true;
-                movePlacement(e);
+                startPlacementGesture(e);
                 return;
             }
             if (e.touches && e.touches.length > 1) return;   // a second finger is not a new stroke
@@ -529,8 +480,7 @@
 
         function stopDrawing() {
             if (pendingShape) {
-                isPlacing = false;   // the shape stays put until the green check is pressed
-                pinch = null;
+                endPlacementGesture();
                 return;
             }
             isDrawing = false;
@@ -539,7 +489,12 @@
 
         function draw(e) {
             if (pendingShape) {
-                if (isPlacing) movePlacement(e);
+                if (isPlacing) {
+                    movePlacement(e);
+                } else if (outsideTap) {
+                    const pt = getPoint(e);
+                    if (Math.hypot(pt.x - outsideTap.x, pt.y - outsideTap.y) > 12) outsideTap = null;   // it was a swipe, not a tap
+                }
                 return;
             }
             if (!isDrawing) return;
@@ -571,6 +526,7 @@
             previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             if (pendingShape && placePoint) {
                 const box = drawShape(pendingShape, placePoint.x, placePoint.y, previewCtx, placeScale);
+                placeBox = box;
                 drawSelectionBox(box);
             }
         }
@@ -612,19 +568,64 @@
                 placeScale = clampScale(pinch.startScale * two.dist / pinch.startDist);
             } else {
                 pinch = null;
-                placePoint = getPoint(e);
+                if (dragOffset) {
+                    const pt = getPoint(e);
+                    placePoint = { x: pt.x + dragOffset.x, y: pt.y + dragOffset.y };
+                }
             }
             renderPreview();
         }
 
-        // Show the shape in the middle right away; dragging moves it from there.
+        // Touching on (or just around) the waiting shape drags it; two fingers resize it.
+        function isOnWaitingShape(pt) {
+            if (!placeBox) return false;
+            const margin = 28;   // generous, so small shapes are still easy to grab
+            return pt.x >= placeBox.x - margin && pt.x <= placeBox.x + placeBox.w + margin &&
+                   pt.y >= placeBox.y - margin && pt.y <= placeBox.y + placeBox.h + margin;
+        }
+
+        function startPlacementGesture(e) {
+            outsideTap = null;
+            if (twoFingers(e)) {
+                dragOffset = null;
+                isPlacing = true;
+                movePlacement(e);
+                return;
+            }
+            const pt = getPoint(e);
+            if (isOnWaitingShape(pt)) {
+                dragOffset = { x: placePoint.x - pt.x, y: placePoint.y - pt.y };
+                isPlacing = true;
+            } else {
+                // Away from the shape: if this ends as a tap (not a swipe or the start of a pinch), the shape is placed.
+                outsideTap = pt;
+            }
+        }
+
+        function endPlacementGesture() {
+            const wasTapOutside = outsideTap !== null;
+            outsideTap = null;
+            isPlacing = false;
+            dragOffset = null;
+            pinch = null;
+            if (wasTapOutside) finishPlacement();
+        }
+
+        // Anything else the child chooses to do next (a tool, the sketch picker, clear) places the waiting shape first.
+        function commitPending() {
+            if (pendingShape) finishPlacement();
+        }
+
+        // Show the shape in the middle right away; drag it or pinch it, then just carry on to place it.
         function startPlacement(shapeType) {
+            commitPending();   // a shape still waiting is placed first
             pendingShape = shapeType;
             placeScale = 1;
             pinch = null;
+            dragOffset = null;
+            outsideTap = null;
             placePoint = { x: canvas.width / 2, y: canvas.height / 2 };
             renderPreview();
-            placementControls.style.display = 'flex';
             stencilPanel.style.display = 'none';
             updateUndoButton();
             if (!marchFrame) marchFrame = requestAnimationFrame(marchTick);
@@ -633,11 +634,13 @@
         function endPlacementMode() {
             pendingShape = null;
             placePoint = null;
+            placeBox = null;
             isPlacing = false;
+            dragOffset = null;
+            outsideTap = null;
             pinch = null;
             if (marchFrame) { cancelAnimationFrame(marchFrame); marchFrame = null; }
             renderPreview();
-            placementControls.style.display = 'none';
             updateUndoButton();
         }
 
@@ -655,7 +658,10 @@
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseleave', () => {
             if (pendingShape) {
+                // The pointer left the page: stop dragging, and don't treat it as a tap.
                 isPlacing = false;
+                dragOffset = null;
+                outsideTap = null;
             } else {
                 stopDrawing();
             }
@@ -673,6 +679,7 @@
         }, {passive: false});
 
         clearBtn.addEventListener('click', () => {
+            commitPending();
             const paintBlank = isBlank(ctx, canvas.width, canvas.height);
             const linesBlank = isBlank(lineCtx, lineCanvas.width, lineCanvas.height);
             if (paintBlank && linesBlank) return;
@@ -682,6 +689,7 @@
         });
 
         loadBtn.addEventListener('click', () => {
+            commitPending();
             stencilPanel.style.display = 'flex';
         });
 
@@ -708,11 +716,13 @@
         }
 
         brushSizeBtn.addEventListener('click', () => {
+            commitPending();
             setTool('brush');
             openColorPanel();
         });
 
         fillBtn.addEventListener('click', () => {
+            commitPending();
             setTool('fill');
             openColorPanel();
         });
@@ -728,9 +738,6 @@
                 undo();
             }
         });
-
-        smallerBtn.addEventListener('click', () => scaleBy(1 / 1.2));
-        biggerBtn.addEventListener('click', () => scaleBy(1.2));
 
         // Every sketch is an SVG path on a 100x100 grid, centered on (50, 50).
         // The same path draws the picker icon and the outline on the canvas.
@@ -1075,9 +1082,6 @@
             ctx.putImageData(paint, 0, 0);
         }
 
-        donePlacementBtn.addEventListener('click', finishPlacement);
-
-        cancelPlacementBtn.addEventListener('click', endPlacementMode);
     </script>
 </body>
 </html>

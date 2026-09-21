@@ -197,10 +197,6 @@
             border-color: #FF9F43;
             background: #fff3e0;
         }
-        .brush-preview-small {
-            border-radius: 50%;
-            display: block;
-        }
     </style>
 </head>
 <body>
@@ -242,13 +238,16 @@
 
     <div id="toolbar">
         <div class="controls">
-            <button id="brushSizeBtn" class="active" aria-label="Brush">
-                <span id="brushPreviewSmall" class="brush-preview-small"></span>
+            <button id="brushSizeBtn" class="active" aria-label="Pen">
+                <svg viewBox="0 0 24 24" width="28" height="28">
+                    <g transform="translate(1.9 0) scale(0.85)"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="#546E7A"/></g>
+                    <rect id="brushBarColor" x="1" y="19.5" width="22" height="4" rx="1.5" fill="#FF5A5F" stroke="#B0BEC5" stroke-width="0.6"/>
+                </svg>
             </button>
             <button id="fillBtn" aria-label="Fill with color">
                 <svg viewBox="0 0 24 24" width="28" height="28">
                     <path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10L10 5.21 14.79 10H5.21zM19 11.5s-2 2.17-2 3.5c0 1.1.9 2 2 2s2-.9 2-2c0-1.33-2-3.5-2-3.5z" fill="#546E7A"/>
-                    <rect id="fillBarColor" x="1" y="19.5" width="22" height="4" rx="1.5" fill="#FF5A5F"/>
+                    <rect id="fillBarColor" x="1" y="19.5" width="22" height="4" rx="1.5" fill="#FF5A5F" stroke="#B0BEC5" stroke-width="0.6"/>
                 </svg>
             </button>
             <div class="btn-group">
@@ -283,7 +282,7 @@
         const clearBtn = document.getElementById('clearBtn');
         const loadBtn = document.getElementById('loadBtn');
         const brushSizeBtn = document.getElementById('brushSizeBtn');
-        const brushPreviewSmall = document.getElementById('brushPreviewSmall');
+        const brushBarColor = document.getElementById('brushBarColor');
 
         // Panel Elements
         const stencilPanel = document.getElementById('stencilPanel');
@@ -347,10 +346,7 @@
 
         // Keep everything that shows the current color and size in step.
         function updateBrushPreview() {
-            const smallSize = Math.max(6, Math.min(30, brushSize));
-            brushPreviewSmall.style.width = `${smallSize}px`;
-            brushPreviewSmall.style.height = `${smallSize}px`;
-            brushPreviewSmall.style.backgroundColor = currentColor;
+            brushBarColor.setAttribute('fill', currentColor);
             fillBarColor.setAttribute('fill', currentColor);
             sizeDots.forEach(({ size, button, dot }) => {
                 button.classList.toggle('active', size === brushSize);

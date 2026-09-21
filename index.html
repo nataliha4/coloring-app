@@ -66,7 +66,7 @@
         #undoBtn:disabled { opacity: 0.35; box-shadow: none; }
         .stencil-tab {
             font-size: 26px;
-            width: 54px;
+            width: 46px;
             height: 48px;
             padding: 0;
             background: #f0f2f5;
@@ -216,7 +216,7 @@
                 <h3 style="margin-bottom: 20px; color: #333; font-family: system-ui, sans-serif; font-size: 18px;">Pick a Sketch!</h3>
 
                 <!-- Large icon buttons that don't require reading (built in the script from SHAPES) -->
-                <div id="stencilTabs" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 16px;"></div>
+                <div id="stencilTabs" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 16px;"></div>
                 <div id="stencilGrid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 80px)); justify-content: center; gap: 12px;"></div>
             </div>
         </div>
@@ -798,6 +798,45 @@
             { cat: 'blocks', label: `Block ${i + 1}`, badge: i + 1, color, tint, iconStroke: 3, d: blockPath(i + 1) }
         ]));
 
+        // Vehicles. Wheels sit in cut-out wheel arches so no body line runs through them.
+        const wheel = (cx, cy, r, hub) => circlePath(cx, cy, r) + ' ' + circlePath(cx, cy, hub);
+        const policePath =
+            'M6 66 V52 C6 48 9 46 13 46 H87 C91 46 94 49 94 53 V66 H85 A11 11 0 0 0 63 66 H37 A11 11 0 0 0 15 66 Z ' +
+            'M22 46 L31 29 H67 L79 46 M28 44 L34 32 H47 V44 Z M52 44 V32 H65 L73 44 Z M43 29 V23 H57 V29 ' +
+            circlePath(89, 55, 3) + ' ' + circlePath(11, 55, 3) + ' ' + wheel(26, 66, 9, 3.5) + ' ' + wheel(74, 66, 9, 3.5);
+        const racePath =
+            'M6 64 V56 L14 52 H34 L44 42 H56 L64 52 H84 L94 60 V64 H84 A12 12 0 0 0 60 64 H40 A12 12 0 0 0 16 64 Z ' +
+            'M6 36 H24 V42 H6 Z M15 42 V52 M40 52 L47 45 H55 L60 52 Z ' + circlePath(50, 59, 5) + ' ' +
+            wheel(28, 64, 10, 4) + ' ' + wheel(72, 64, 10, 4);
+        const fireTruckPath =
+            'M6 66 V36 H56 V44 H74 L88 56 H94 V66 H87 A11 11 0 0 0 65 66 H35 A11 11 0 0 0 13 66 Z ' +
+            'M10 36 V30 H52 V36 M18 30 V36 M26 30 V36 M34 30 V36 M42 30 V36 ' +
+            'M60 48 H72 L81 56 H60 Z M62 44 V38 H68 V44 ' + circlePath(38, 47, 7) + ' ' + circlePath(38, 47, 2.5) + ' ' +
+            wheel(24, 66, 9, 3.5) + ' ' + wheel(76, 66, 9, 3.5);
+        const busPath =
+            'M6 66 V26 Q6 22 10 22 H90 Q94 22 94 26 V66 H85 A10 10 0 0 0 65 66 H35 A10 10 0 0 0 15 66 Z ' +
+            'M11 30 H29 V46 H11 Z M33 30 H51 V46 H33 Z M55 30 H73 V46 H55 Z M77 30 H89 V46 H77 Z M6 52 H94 ' +
+            circlePath(89, 59, 3) + ' ' + wheel(25, 66, 8, 3) + ' ' + wheel(75, 66, 8, 3);
+        const boatPath =
+            'M8 62 H92 L80 78 H20 Z M50 62 V14 M50 18 V58 H24 Z M54 28 V58 H78 Z M50 14 H62 L58 18 L62 22 H50 ' +
+            circlePath(36, 70, 3) + ' ' + circlePath(50, 70, 3) + ' ' + circlePath(64, 70, 3) +
+            ' M8 86 Q14 81 20 86 T32 86 T44 86 T56 86 T68 86 T80 86 T92 86';
+        const planePath =
+            'M6 48 C6 42 12 40 20 40 H72 C86 40 94 46 94 50 C94 54 86 58 72 58 H20 C12 58 6 54 6 48 Z ' +
+            'M10 41 L6 24 H20 L30 40 M42 58 L28 76 H44 L64 58 ' +
+            [26, 38, 50, 62].map(x => ' ' + circlePath(x, 49, 3.2)).join('') + ' M76 44 H84 L88 50 H76 Z';
+        const helicopterPath =
+            'M16 56 C16 42 28 36 42 36 C54 36 62 42 64 50 L64 58 C64 63 60 66 56 66 H24 C19 66 16 62 16 56 Z ' +
+            'M64 46 H86 V54 H64 M86 46 L92 34 H96 L92 54 H86 M28 54 C28 44 36 40 44 40 H50 V54 Z ' +
+            'M42 36 V28 M8 24 H76 V28 H8 Z M24 66 V76 M54 66 V76 M14 76 H66';
+        const trainPath =
+            'M8 60 V28 H32 V40 H82 V60 Z M4 28 H36 V24 H4 Z M69 40 L67 28 H81 L79 40 M52 40 C52 32 60 32 60 40 ' +
+            'M12 34 H28 V48 H12 Z M82 44 H88 V52 H82 M82 60 L94 68 H82 ' +
+            wheel(20, 69, 9, 3.5) + ' ' + wheel(44, 69, 9, 3.5) + ' ' + wheel(70, 69, 9, 3.5);
+        const rocketPath =
+            'M50 8 C66 22 70 44 66 66 H34 C30 44 34 22 50 8 Z ' + circlePath(50, 38, 8) +
+            ' M34 52 L20 72 L34 66 M66 52 L80 72 L66 66 M40 66 H60 L56 76 H44 Z M44 76 Q50 94 56 76 Z';
+
         // Words to color in. Drawn as hollow outline letters in a friendly, rounded system font.
         const WORD_FONT = "'Chalkboard SE', 'Comic Sans MS', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif";
         const wordColors = [
@@ -841,6 +880,16 @@
                        d: 'M34 12 C40 22 60 22 66 12 L90 26 L80 44 L70 38 V88 H30 V38 L20 44 L10 26 Z ' +
                           'M37 54 L43 48 V74 M57 48 A7 13 0 1 1 57 74 A7 13 0 1 1 57 48 Z' },
 
+            police:     { cat: 'vehicles', label: 'Police car', color: '#1E88E5', tint: '#e3f2fd', iconStroke: 4.5, d: policePath },
+            racecar:    { cat: 'vehicles', label: 'Race car', color: '#E53935', tint: '#ffebee', iconStroke: 4.5, d: racePath },
+            firetruck:  { cat: 'vehicles', label: 'Fire truck', color: '#FF7A00', tint: '#fff3e0', iconStroke: 4.5, d: fireTruckPath },
+            bus:        { cat: 'vehicles', label: 'Bus', color: '#F9A825', tint: '#fffde7', iconStroke: 4.5, d: busPath },
+            boat:       { cat: 'vehicles', label: 'Boat', color: '#00897B', tint: '#e0f2f1', iconStroke: 4.5, d: boatPath },
+            airplane:   { cat: 'vehicles', label: 'Airplane', color: '#00A6FF', tint: '#e1f5fe', iconStroke: 4.5, d: planePath },
+            helicopter: { cat: 'vehicles', label: 'Helicopter', color: '#8E24AA', tint: '#f3e5f5', iconStroke: 4.5, d: helicopterPath },
+            train:      { cat: 'vehicles', label: 'Train', color: '#43A047', tint: '#e8f5e9', iconStroke: 4.5, d: trainPath },
+            rocket:     { cat: 'vehicles', label: 'Rocket', color: '#E91E63', tint: '#fce4ec', iconStroke: 4.5, d: rocketPath },
+
             ...blockShapes,
             ...wordShapes
         };
@@ -850,6 +899,7 @@
             { id: 'shapes', icon: '⭐', label: 'Shapes' },
             { id: 'blocks', icon: '🔢', label: 'Blocks' },
             { id: 'soccer', icon: '⚽', label: 'Soccer' },
+            { id: 'vehicles', icon: '🚗', label: 'Vehicles' },
             { id: 'words', label: 'Words', icon:
                 `<span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #E53935; color: white; font: bold 24px/1 ${WORD_FONT};">R</span>` }
         ];

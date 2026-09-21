@@ -877,33 +877,22 @@
             wu:    ['Wu', '#F9A825', '#fffde7'],    pixal: ['Pixal', '#EC407A', '#fce4ec'],
             morro: ['Morro', '#00796B', '#e0f2f1']
         };
-        // Each hero as a figure, plus their name as a word (the name buttons are only shown in the Ninja tab).
+        // Each hero as a figure; the name is only a small hint under it (the real names live in the Words tab).
         const ninjaShapes = {};
         Object.entries(ninjaStyle).forEach(([key, [name, color, tint]]) => {
-            ninjaShapes[`ninja_${key}`] = { cat: 'ninja', label: name, color, tint, iconStroke: 3.5, d: ninjaPaths[key] };
-            ninjaShapes[`ninjaname_${key}`] = { cat: 'ninja-name', label: name, word: name, color, tint };
+            ninjaShapes[`ninja_${key}`] = { cat: 'ninja', label: name, hint: name, color, tint, iconStroke: 3.5, d: ninjaPaths[key] };
         });
-        // Picker order for the Ninja tab: a row of three figures, then the row of their names right underneath.
-        const ninjaOrder = [];
-        const ninjaKeys = Object.keys(ninjaStyle);
-        for (let i = 0; i < ninjaKeys.length; i += 3) {
-            const row = ninjaKeys.slice(i, i + 3);
-            row.forEach(k => ninjaOrder.push(`ninja_${k}`));
-            row.forEach(k => ninjaOrder.push(`ninjaname_${k}`));
-        }
 
         // Words to color in. Drawn as hollow outline letters in a friendly, rounded system font.
         const WORD_FONT = "'Chalkboard SE', 'Comic Sans MS', 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif";
-        const wordColors = [
-            ['#E53935', '#ffebee'], ['#1E88E5', '#e3f2fd'], ['#43A047', '#e8f5e9'], ['#FB8C00', '#fff3e0'],
-            ['#8E24AA', '#f3e5f5'], ['#00897B', '#e0f2f1']
-        ];
+        // A ninja's name is colored like their figure. Family names get colors no ninja uses.
+        const heroColor = Object.fromEntries(Object.values(ninjaStyle).map(([name, color, tint]) => [name, [color, tint]]));
+        const familyColor = { Roman: ['#8E24AA', '#f3e5f5'], Ezra: ['#FB8C00', '#fff3e0'], Messi: ['#6D4C41', '#efebe9'] };
         const wordShapes = Object.fromEntries([
-            'Roman', 'Ezra', 'Messi',                    // family favorites
-            'Kai', 'Jay', 'Cole', 'Zane', 'Lloyd', 'Nya', // ninja heroes
-            'Wu', 'Pixal', 'Morro'                       // more Ninjago names
-        ].map((word, i) => {
-            const [color, tint] = wordColors[i % wordColors.length];
+            'Roman', 'Ezra', 'Messi',                                     // family favorites
+            'Kai', 'Jay', 'Cole', 'Zane', 'Lloyd', 'Nya', 'Wu', 'Pixal', 'Morro'  // Ninjago names
+        ].map((word) => {
+            const [color, tint] = familyColor[word] || heroColor[word];
             return [`word_${word}`, { cat: 'words', label: word, word, color, tint }];
         }));
 
@@ -956,7 +945,7 @@
             { id: 'blocks', icon: '🔢', label: 'Blocks' },
             { id: 'soccer', icon: '⚽', label: 'Soccer' },
             { id: 'vehicles', icon: '🚗', label: 'Vehicles' },
-            { id: 'ninja', icon: '🥷', label: 'Ninja', items: ninjaOrder },
+            { id: 'ninja', icon: '🥷', label: 'Ninja' },
             { id: 'words', label: 'Words', icon:
                 `<span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: #E53935; color: white; font: bold 20px/1 ${WORD_FONT};">R</span>` }
         ];
@@ -1049,25 +1038,31 @@
                 stencilTabs.appendChild(tab);
             });
 
-            const activeDef = CATEGORIES.find(cat => cat.id === activeCategory);
-            const entries = activeDef.items
-                ? activeDef.items.map(name => [name, SHAPES[name]])
-                : Object.entries(SHAPES).filter(([, shape]) => shape.cat === activeCategory);
-            entries.forEach(([name, shape]) => {
-                const button = document.createElement('button');
-                button.className = 'stencil-option';
-                button.dataset.shape = name;
-                button.setAttribute('aria-label', shape.label || name);
-                button.style.cssText = `background: ${shape.tint}; border: 3px solid ${shape.color}; border-radius: 15px; padding: 10px; width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; cursor: pointer;`;
-                button.style.position = 'relative';
-                const fontPx = shape.word ? (shape.word.length <= 3 ? 28 : shape.word.length === 4 ? 23 : 18) : 0;
-                button.innerHTML = (shape.word
-                    ? `<span style="font: bold ${fontPx}px ${WORD_FONT}; color: ${shape.color}; pointer-events: none;">${shape.word}</span>`
-                    : `<svg viewBox="0 0 100 100" style="width: 100%; height: 100%; pointer-events: none;"><path d="${shape.d}" fill="none" stroke="${shape.color}" stroke-width="${shape.iconStroke || 6}" stroke-linejoin="round" stroke-linecap="round"/></svg>`) +
-                    (shape.badge ? `<span style="position: absolute; right: 6px; bottom: 2px; font-size: 16px; font-weight: bold; color: ${shape.color}; pointer-events: none;">${shape.badge}</span>` : '');
-                button.addEventListener('click', () => startPlacement(name));
-                stencilGrid.appendChild(button);
-            });
+            Object.entries(SHAPES)
+                .filter(([, shape]) => shape.cat === activeCategory)
+                .forEach(([name, shape]) => {
+                    const button = document.createElement('button');
+                    button.className = 'stencil-option';
+                    button.dataset.shape = name;
+                    button.setAttribute('aria-label', shape.label || name);
+                    button.style.cssText = `background: ${shape.tint}; border: 3px solid ${shape.color}; border-radius: 15px; padding: 10px; width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; cursor: pointer;`;
+                    button.style.position = 'relative';
+                    const fontPx = shape.word ? (shape.word.length <= 3 ? 28 : shape.word.length === 4 ? 23 : 18) : 0;
+                    const iconStyle = shape.hint
+                        ? 'width: 100%; flex: 1 1 0; min-height: 0; pointer-events: none;'
+                        : 'width: 100%; height: 100%; pointer-events: none;';
+                    if (shape.hint) {
+                        button.style.flexDirection = 'column';
+                        button.style.padding = '6px 4px 4px';
+                    }
+                    button.innerHTML = (shape.word
+                        ? `<span style="font: bold ${fontPx}px ${WORD_FONT}; color: ${shape.color}; pointer-events: none;">${shape.word}</span>`
+                        : `<svg viewBox="0 0 100 100" style="${iconStyle}"><path d="${shape.d}" fill="none" stroke="${shape.color}" stroke-width="${shape.iconStroke || 6}" stroke-linejoin="round" stroke-linecap="round"/></svg>`) +
+                        (shape.hint ? `<span style="font: bold 11px/1.2 system-ui, sans-serif; color: ${shape.color}; pointer-events: none;">${shape.hint}</span>` : '') +
+                        (shape.badge ? `<span style="position: absolute; right: 6px; bottom: 2px; font-size: 16px; font-weight: bold; color: ${shape.color}; pointer-events: none;">${shape.badge}</span>` : '');
+                    button.addEventListener('click', () => startPlacement(name));
+                    stencilGrid.appendChild(button);
+                });
         }
         renderStencilPicker();
 
